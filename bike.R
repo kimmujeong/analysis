@@ -88,3 +88,4 @@ head(test)
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
 
 #수정
+#수정2
