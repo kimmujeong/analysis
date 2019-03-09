@@ -86,3 +86,4 @@ head(test)
 #write.csv자체 함수에서 이용할수없는거같고 따라서 write.table함수를 이용해야함
 #write.csv(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count")) 오류코드
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
+write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
