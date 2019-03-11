@@ -87,3 +87,38 @@ head(test)
 #write.csv(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count")) 오류코드
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
+
+#measuring Root Mean Square Error(RMSE)
+rmse<-function(data,predict,ground.truth){
+  N<-nrow(data)
+  err<-(data[,predict]-data[,ground.truth])^2
+  sqrt(sum(err))/N
+}
+
+#data permutation
+permutate<-function(data){
+  size<-nrow(data)
+  shuffling<-sample(1:size,size)
+  data[shuffling,]
+}
+
+#cross-validation
+cv<-function(formula,data,FUN,k=5){
+  temp<-permutate(data)
+  N<-nrow(data)
+  unit<-N/k
+  scores<-vector(length=k)
+  for(i in 1:k){
+    from<-unit*(i-1)
+    to<-from+unit
+    train<-data[-(from:to),]
+    test<-data[from:to,]
+    model<-FUN(formula,train)
+    test$pre<-predict(model,test)
+    scores[i]<-rmse(test,'pre',as.character(formula)[2])
+  }
+  scores
+}
+result<-cv(formula,train,FUN=randomForest,k=5)
+result
+mean(result)
