@@ -5,13 +5,13 @@ pubg_train<-read.csv("C:\\Users\\thgus\\Downloads\\pubg-finish-placement-predict
 pubg_test<-read.csv("C:\\Users\\thgus\\Downloads\\pubg-finish-placement-prediction\\test_V2.csv")
 save(pubg_train,file="./pubg_train.RData")
 
-head(pubg_train,20)
-head(pubg_train[order(pubg_train$groupId,decreasing = T),])
-str(pubg_train)
-nrow(pubg_train)
-
-pubg_train %>%
-  count(pubg_train$groupId)
+# head(pubg_train,20)
+# head(pubg_train[order(pubg_train$groupId,decreasing = T),])
+# str(pubg_train)
+# nrow(pubg_train)
+# 
+# pubg_train %>%
+#   count(pubg_train$groupId)
 
 #pubg_train$groupId
 #pubg_train[!duplicated(pubg_train$groupId),]
@@ -36,18 +36,18 @@ new_pubg_train<-pubg_train %>%
 nrow(new_pubg_train) #89509
 nrow(pubg_train) #4446966
 
-#킬포인트 윈포인트 랭크포인트 상관관계 분석
-cor(pubg_train$killPoints,pubg_train$winPoints) #0.9834167 강한 양의 관계
-cor(pubg_train$rankPoints,pubg_train$killPoints) #-0.975555 강한 음의 관계
-cor(pubg_train$rankPoints,pubg_train$winPoints) #-0.9938454 강한 음의 관계
-
-#킬포인트와 윈포인트로 최종결과 관계 보기 위해서
-head(new_pubg_train[order(new_pubg_train$killPoints,decreasing = TRUE),])
-head(new_pubg_train[order(new_pubg_train$winPoints,decreasing = TRUE),])
-
-#최종결과에 보다 높은 상관관계를 갖는 것은 윈포인트.. 당연한 것
-cor(new_pubg_train$killPoints, new_pubg_train$winPlacePerc) #0.0898857
-cor(new_pubg_train$winPoints, new_pubg_train$winPlacePerc) #0.2046172
+# #킬포인트 윈포인트 랭크포인트 상관관계 분석
+# cor(pubg_train$killPoints,pubg_train$winPoints) #0.9834167 강한 양의 관계
+# cor(pubg_train$rankPoints,pubg_train$killPoints) #-0.975555 강한 음의 관계
+# cor(pubg_train$rankPoints,pubg_train$winPoints) #-0.9938454 강한 음의 관계
+# 
+# #킬포인트와 윈포인트로 최종결과 관계 보기 위해서
+# head(new_pubg_train[order(new_pubg_train$killPoints,decreasing = TRUE),])
+# head(new_pubg_train[order(new_pubg_train$winPoints,decreasing = TRUE),])
+# 
+# #최종결과에 보다 높은 상관관계를 갖는 것은 윈포인트.. 당연한 것
+# cor(new_pubg_train$killPoints, new_pubg_train$winPlacePerc) #0.0898857
+# cor(new_pubg_train$winPoints, new_pubg_train$winPlacePerc) #0.2046172
 
 ############################################################################################
 ############################################################################################
@@ -123,10 +123,10 @@ cor(new_pubg_train$winPoints, new_pubg_train$winPlacePerc) #0.2046172
 ############################################################################################
 ############################################################################################
 ############################################################################################
-###XGBOOST
+###XGB 1
 
 #install.packages("xgboost")
-colnames(new_pubg_train)
+# colnames(new_pubg_train)
 xgboost_pubg_train<-data.matrix(subset(new_pubg_train,select = -c(Id,groupId,matchId,matchType,winPlacePerc)))
 xgb<-xgboost(data=xgboost_pubg_train,label=new_pubg_train$winPlacePerc,
              eta = 0.2,
@@ -141,11 +141,20 @@ xgb<-xgboost(data=xgboost_pubg_train,label=new_pubg_train$winPlacePerc,
 
 xgboost_pubg_test<-data.matrix(subset(pubg_test,select = -c(Id,groupId,matchId,matchType)))
 xgb_pred<-predict(xgb,xgboost_pubg_test)
-head(xgb_pred)
-head(pubg_test)
+# head(xgb_pred)
+# head(pubg_test)
 pubg_test$winPlacePerc<-xgb_pred
-head(pubg_test)
+# head(pubg_test)
 write.csv(pubg_test[,c("Id","winPlacePerc")],file="submission.csv",row.names = FALSE)
-
 #write.table(pubg_test[,c("Id","winPlacePerc")],file="submission.csv",row.names = FALSE)
+
+#############################################################################################
+####XGB 2......시간이 너무 오래걸림
+sum(is.na(pubg_train))
+pubg_train[!complete.cases(pubg_train),] #NA값있는 데이터 찾기
+pubg_train<-na.omit(pubg_train) #NA값 제거
+
+xgb_pubg_train2<-data.matrix(subset(pubg_train,select = -c(Id,groupId,matchId,matchType,winPlacePerc)))
+#############################################################################################
+
 
