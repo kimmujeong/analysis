@@ -143,7 +143,7 @@ xgboost_pubg_test<-data.matrix(subset(pubg_test,select = -c(Id,groupId,matchId,m
 xgb_pred<-predict(xgb,xgboost_pubg_test)
 # head(xgb_pred)
 # head(pubg_test)
-pubg_test$winPlacePerc<-xgb_pred
+pubg_test$winPlacePerc<-xgb_pred # pubg_test$winPlacePerc<-predict(xgb,xgboost_pubg_test) 한방에 
 # head(pubg_test)
 write.csv(pubg_test[,c("Id","winPlacePerc")],file="submission.csv",row.names = FALSE)
 #write.table(pubg_test[,c("Id","winPlacePerc")],file="submission.csv",row.names = FALSE)

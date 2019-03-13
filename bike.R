@@ -85,6 +85,7 @@ head(test)
 #향상된 count를 count2로 df에 저장했고 이를 그대로 write.csv로 하려했는데 컬럼이름지정이 안됨.
 #write.csv자체 함수에서 이용할수없는거같고 따라서 write.table함수를 이용해야함
 #write.csv(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count")) 오류코드
+#write.table 할때는 sep 꼭해야함
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
 write.table(test[,c("datetime","count2")],file="result2.csv",row.names = FALSE,col.names = c("datetime","count"),sep=",")
 
