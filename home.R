@@ -3,6 +3,8 @@ library(dplyr)
 library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
+library(rBayesianOptimization)
+library(MlBayesOpt)
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 
@@ -84,30 +86,31 @@ new_home_test$yr_renovated<-as.numeric(new_home_test$yr_renovated)
 new_home_test$zipcode<-as.numeric(new_home_test$zipcode)
 new_home_test$sqft_living15<-as.numeric(new_home_test$sqft_living15)
 new_home_test$sqft_lot15<-as.numeric(new_home_test$sqft_lot15)
+#lapply(new_home_test,as.numeric) 써보기 
 str(new_home_test)
-
-home_train$price<-as.factor(home_train$price)
-new_home_test$price<-as.factor(new_home_test$price)
-trainTask<-makeClassifTask(data = home_train,target = "price")
 
 
 xgb_train<-data.matrix(subset(home_train,select = -c(id,date,price)))
+set.seed(1234)
 home_xgb<-xgboost(data=xgb_train,
                   label=home_train$price,
                   eta = 0.2, #gradient descent 알고리즘에서의 learning rate
-                  nround = 600, #maximum number of iterations (steps) required for gradient descent to converge
+                  nround = 443, #maximum number of iterations (steps) required for gradient descent to converge 600
                   subsample = 0.8,
                   colsample_bytree = 0.8,
                   seed = 1,
                   eval_metric = "rmse", #회귀모델에서는 RMSE를 모델 accuracy 평가지표로 활용
                   objective = "reg:linear",
-                  nthread = 3,
+                  #nthread = 3, 동시 처리 수 이며, 시스템의 코어 수에 대응하여 입력되어야 한다. 모든 코어를 사용하려면, 값을 할당하지 않는다(알고리즘 감지한다).
                   max_depth = 5)
+
 
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(home_xgb, xgb_test)
 
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_numeric.csv",row.names = FALSE)
+
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_nround_443.csv",row.names = FALSE)
+
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),home_xgb)
@@ -116,34 +119,59 @@ xgb.plot.importance(var_importance) #xgb자체함수
 
 
 #cv, 241이 나왓는데 결과가 더 안좋아짐 
-xgb_train_ex<-data.matrix(subset(home_train,select = -c(id,date,price)))
+xgb_train_ex<-data.matrix(subset(home_train,select = -c(id,price)))
 dtrain <- xgb.DMatrix(data = xgb_train_ex,label = home_train$price)
-params <- list(booster = "gbtree", eta = 0.2, subsample = 0.8, colsample_bytree = 0.8, seed = 1, eval_metric = "rmse", objective = "reg:linear", nthread = 3, max_depth = 5)
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 600, nfold = 5, showsd = T, stratified = T, print.every_n = 10, early_stopping_rounds = 20, maximize = F)
+param <- list(eta = 0.2, subsample = 0.8, colsample_bytree = 0.8, seed = 1, eval_metric = "rmse", objective = "reg:linear", max_depth = 5)
+
+##################################################################################################
+################################################parameter1########################################
+#xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 600, nfold = 5, showsd = T, stratified = T, print.every_n = 10, early_stopping_rounds = 20, maximize = F)
+cv.nround=1000
+cv.nfold=5
+mdcv<-xgb.cv(data=dtrain, params = param, nfold=cv.nfold, nrounds = cv.nround, verbose = T)
+
+min_rmse=min(mdcv$evaluation_log[, test_rmse_mean])
+min_rmse_index = which.min(mdcv$evaluation_log[, test_rmse_mean])
+min_rmse_index
+##################################################################################################
+##################################################################################################
 
 
 
+##################################################################################################
+#################################################parameter2#######################################
+#https://datascience.stackexchange.com/questions/9364/hypertuning-xgboost-parameters
 
-getParamSet("classif.xgboost")
-xg_set <- makeLearner("classif.xgboost", predict.type = "response")
-xg_set$par.vals <- list(
-  objective = "reg:linear",
-  eval_metric = "rmse",
-  nrounds = 600
-)
+searchGridSubCol <- expand.grid(subsample = c(0.5, 0.75, 1),
+                                colsample_bytree = c(0.6, 0.8, 1))
+ntrees <- 10
 
-xg_ps <- makeParamSet(
-  makeIntegerParam("nrounds",lower=200,upper=600),
-  makeIntegerParam("max_depth",lower=3,upper=20),
-  makeNumericParam("lambda",lower=0.55,upper=0.60),
-  makeNumericParam("eta", lower = 0.001, upper = 0.5),
-  makeNumericParam("subsample", lower = 0.10, upper = 0.80),
-  makeNumericParam("min_child_weight",lower=1,upper=5),
-  makeNumericParam("colsample_bytree",lower = 0.2,upper = 0.8)
-)
-rancontrol <- makeTuneControlRandom(maxit = 100L)
-set_cv <- makeResampleDesc("CV",iters = 3L)
-xg_tune <- tuneParams(learner = xg_set, task = trainTask, resampling = set_cv,measures = acc,par.set = xg_ps, control = rancontrol)
+#Build a xgb.DMatrix object
+xgb_train2<-data.matrix(subset(home_train,select = -c(id)))
+DMMatrixTrain <- xgb.DMatrix(data = xgb_train2, label = home_train$price)
+
+rmseErrorsHyperparameters <- apply(searchGridSubCol, 1, function(parameterList){
+  
+  #Extract Parameters to test
+  currentSubsampleRate <- parameterList[["subsample"]]
+  currentColsampleRate <- parameterList[["colsample_bytree"]]
+  
+  xgboostModelCV <- xgb.cv(data =  DMMatrixTrain, nrounds = ntrees, nfold = 5, showsd = TRUE, 
+                           metrics = "rmse", verbose = TRUE, "eval_metric" = "rmse",
+                           "objective" = "reg:linear", "max.depth" = 15, "eta" = 2/ntrees,                               
+                           "subsample" = currentSubsampleRate, "colsample_bytree" = currentColsampleRate)
+  
+  rmse <- tail(xgboostModelCV$evaluation_log[, test_rmse_mean], 1)
+  
+  return(c(rmse, currentSubsampleRate, currentColsampleRate))
+  
+})
+rmseErrorsHyperparameters
+##################################################################################################
+##################################################################################################
+
+#중요변수(3~4개)를 다 합쳐보기
+#요일 추가
 
 
 "
