@@ -2,19 +2,22 @@ library(randomForest)
 library(dplyr)
 library(xgboost)
 library(ggplot2)
+library(mlr) #파리미터튜닝
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 
-sum(is.na(home_train))
-head(home_train)
-colnames(home_train)
-str(home_train)
-head(home_train$date,20)
+#구조확인
+# sum(is.na(home_train))
+# head(home_train)
+# colnames(home_train)
+# str(home_train)
+# head(home_train$date,20)
 
 #home_train 날짜 전처리
 home_train$year<-as.numeric(substr(home_train$date,1,4))
 home_train$month<-as.numeric(substr(home_train$date,5,6))
 home_train$day<-as.numeric(substr(home_train$date,7,8))
+home_train<-subset(home_train,select = -c(date))
 
 #home_test 날짜 전처리
 home_test
@@ -49,6 +52,45 @@ write.csv(home_test3[,c("id","price")],file="home_randomForest2.csv",row.names =
 #########################################################################################################
 #########################################################################################################
 ########################################xgb
+
+#as.num 작업 
+home_train$bedrooms<-as.numeric(home_train$bedrooms)
+home_train$sqft_living<-as.numeric(home_train$sqft_living)
+home_train$sqft_lot<-as.numeric(home_train$sqft_lot)
+home_train$waterfront<-as.numeric(home_train$waterfront)
+home_train$view<-as.numeric(home_train$view)
+home_train$condition<-as.numeric(home_train$condition)
+home_train$grade<-as.numeric(home_train$grade)
+home_train$sqft_above<-as.numeric(home_train$sqft_above)
+home_train$sqft_basement<-as.numeric(home_train$sqft_basement)
+home_train$yr_built<-as.numeric(home_train$yr_built)
+home_train$yr_renovated<-as.numeric(home_train$yr_renovated)
+home_train$zipcode<-as.numeric(home_train$zipcode)
+home_train$sqft_living15<-as.numeric(home_train$sqft_living15)
+home_train$sqft_lot15<-as.numeric(home_train$sqft_lot15)
+str(home_train)
+
+new_home_test$bedrooms<-as.numeric(new_home_test$bedrooms)
+new_home_test$sqft_living<-as.numeric(new_home_test$sqft_living)
+new_home_test$sqft_lot<-as.numeric(new_home_test$sqft_lot)
+new_home_test$waterfront<-as.numeric(new_home_test$waterfront)
+new_home_test$view<-as.numeric(new_home_test$view)
+new_home_test$condition<-as.numeric(new_home_test$condition)
+new_home_test$grade<-as.numeric(new_home_test$grade)
+new_home_test$sqft_above<-as.numeric(new_home_test$sqft_above)
+new_home_test$sqft_basement<-as.numeric(new_home_test$sqft_basement)
+new_home_test$yr_built<-as.numeric(new_home_test$yr_built)
+new_home_test$yr_renovated<-as.numeric(new_home_test$yr_renovated)
+new_home_test$zipcode<-as.numeric(new_home_test$zipcode)
+new_home_test$sqft_living15<-as.numeric(new_home_test$sqft_living15)
+new_home_test$sqft_lot15<-as.numeric(new_home_test$sqft_lot15)
+str(new_home_test)
+
+home_train$price<-as.factor(home_train$price)
+new_home_test$price<-as.factor(new_home_test$price)
+trainTask<-makeClassifTask(data = home_train,target = "price")
+
+
 xgb_train<-data.matrix(subset(home_train,select = -c(id,date,price)))
 home_xgb<-xgboost(data=xgb_train,
                   label=home_train$price,
@@ -65,7 +107,7 @@ home_xgb<-xgboost(data=xgb_train,
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(home_xgb, xgb_test)
 
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse.csv",row.names = FALSE)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_numeric.csv",row.names = FALSE)
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),home_xgb)
@@ -82,7 +124,26 @@ xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 600, nfold = 5, shows
 
 
 
+getParamSet("classif.xgboost")
+xg_set <- makeLearner("classif.xgboost", predict.type = "response")
+xg_set$par.vals <- list(
+  objective = "reg:linear",
+  eval_metric = "rmse",
+  nrounds = 600
+)
 
+xg_ps <- makeParamSet(
+  makeIntegerParam("nrounds",lower=200,upper=600),
+  makeIntegerParam("max_depth",lower=3,upper=20),
+  makeNumericParam("lambda",lower=0.55,upper=0.60),
+  makeNumericParam("eta", lower = 0.001, upper = 0.5),
+  makeNumericParam("subsample", lower = 0.10, upper = 0.80),
+  makeNumericParam("min_child_weight",lower=1,upper=5),
+  makeNumericParam("colsample_bytree",lower = 0.2,upper = 0.8)
+)
+rancontrol <- makeTuneControlRandom(maxit = 100L)
+set_cv <- makeResampleDesc("CV",iters = 3L)
+xg_tune <- tuneParams(learner = xg_set, task = trainTask, resampling = set_cv,measures = acc,par.set = xg_ps, control = rancontrol)
 
 
 "
