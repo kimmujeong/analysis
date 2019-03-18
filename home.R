@@ -7,25 +7,27 @@ library(rBayesianOptimization)
 library(MlBayesOpt)
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
-
+rm(list=ls())
 #구조확인
 # sum(is.na(home_train))
 # head(home_train)
 # colnames(home_train)
 # str(home_train)
 # head(home_train$date,20)
-
+head(home_train$date)
 #home_train 날짜 전처리
 home_train$year<-as.numeric(substr(home_train$date,1,4))
 home_train$month<-as.numeric(substr(home_train$date,5,6))
 home_train$day<-as.numeric(substr(home_train$date,7,8))
+home_train$weekday<-as.integer(format(as.POSIXct(home_train$date,format="%Y%m%dT000000"),format="%u"))
 home_train<-subset(home_train,select = -c(date))
 
 #home_test 날짜 전처리
-home_test
+
 home_test$year<-as.numeric(substr(home_test$date,1,4))
 home_test$month<-as.numeric(substr(home_test$date,5,6))
 home_test$day<-as.numeric(substr(home_test$date,7,8))
+home_test$weekday<-as.integer(format(as.POSIXct(home_test$date,format="%Y%m%dT000000"),format="%u"))
 home_test2<-subset(home_test,select = -c(date))
 new_home_test<-home_test2 #계속 연습에 쓰일 new_home_test
 
@@ -70,6 +72,7 @@ home_train$yr_renovated<-as.numeric(home_train$yr_renovated)
 home_train$zipcode<-as.numeric(home_train$zipcode)
 home_train$sqft_living15<-as.numeric(home_train$sqft_living15)
 home_train$sqft_lot15<-as.numeric(home_train$sqft_lot15)
+home_train$weekday<-as.numeric(home_train$weekday)
 str(home_train)
 
 new_home_test$bedrooms<-as.numeric(new_home_test$bedrooms)
@@ -89,28 +92,29 @@ new_home_test$sqft_lot15<-as.numeric(new_home_test$sqft_lot15)
 #lapply(new_home_test,as.numeric) 써보기 
 str(new_home_test)
 
-
-xgb_train<-data.matrix(subset(home_train,select = -c(id,date,price)))
+str(home_train)
+xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
 set.seed(1234)
 home_xgb<-xgboost(data=xgb_train,
                   label=home_train$price,
-                  eta = 0.2, #gradient descent 알고리즘에서의 learning rate
-                  nround = 443, #maximum number of iterations (steps) required for gradient descent to converge 600
-                  subsample = 0.8,
-                  colsample_bytree = 0.8,
+                  eta = 0.104, #gradient descent 알고리즘에서의 learning rate 0.2
+                  nround = 600, #maximum number of iterations (steps) required for gradient descent to converge 600
+                  subsample = 0.765, #0.8
+                  colsample_bytree = 0.652, #0.8
                   seed = 1,
                   eval_metric = "rmse", #회귀모델에서는 RMSE를 모델 accuracy 평가지표로 활용
                   objective = "reg:linear",
                   #nthread = 3, 동시 처리 수 이며, 시스템의 코어 수에 대응하여 입력되어야 한다. 모든 코어를 사용하려면, 값을 할당하지 않는다(알고리즘 감지한다).
-                  max_depth = 5)
+                  max_depth = 5) #5
 
 
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(home_xgb, xgb_test)
 
 
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_nround_443.csv",row.names = FALSE)
 
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_getParam2.csv",row.names = FALSE)
+#getParma2:eta = 0.104,nround = 600,subsample = 0.765, colsample_bytree = 0.652, seed = 1,eval_metric ="rmse" objective = "reg:linear",max_depth = 5 
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),home_xgb)
@@ -170,6 +174,31 @@ rmseErrorsHyperparameters
 ##################################################################################################
 ##################################################################################################
 
+##################################################################################################
+#################################################parameter3#######################################
+getParamSet("regr.xgboost")
+xg_set <- makeLearner("regr.xgboost", predict.type = "response")
+xg_set$par.vals <- list(
+  objective = "reg:linear",
+  eval_metric = "rmse",
+  nrounds = 600
+)
+xg_ps <- makeParamSet(
+  makeIntegerParam("nrounds",lower=100,upper=700),
+  makeIntegerParam("max_depth",lower=4,upper=8),
+  makeNumericParam("eta", lower = 0.02, upper = 0.3),
+  makeNumericParam("subsample", lower = 0, upper = 1),
+  makeNumericParam("colsample_bytree",lower = 0,upper = 1)
+)
+rancontrol <- makeTuneControlRandom(maxit = 5L) #40L부터 시간좀걸림
+set_cv <- makeResampleDesc("CV",iters = 3L)
+trainTask <- makeRegrTask(data = home_train,target = "price")
+trainTask <- normalizeFeatures(trainTask,method = "standardize")
+set.seed(1234)
+xg_tune <- tuneParams(learner = xg_set, task = trainTask, resampling = set_cv,measures = rmse, par.set = xg_ps, control = rancontrol)
+
+##################################################################################################
+##################################################################################################
 #중요변수(3~4개)를 다 합쳐보기
 #요일 추가
 
