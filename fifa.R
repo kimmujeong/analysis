@@ -5,7 +5,7 @@ library(scales) #달러표시
 #install.packages("stringr")
 fifa<-read.csv("C:\\Users\\thgus\\Desktop\\fifa.csv",header=T,encoding = "UTF-8")
 #유로표시가 있어서 인식이 처음에 안되었다. 콘솔창에 Sys.setlocale(category="LC_ALL",locale="us") 입력 후 해결
-
+Sys.setlocale(category="LC_ALL",locale="us")
 head(fifa)
 fifa$ag
 ###############################################################################
