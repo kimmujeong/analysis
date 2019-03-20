@@ -5,9 +5,15 @@ library(ggplot2)
 library(mlr) #파리미터튜닝
 library(rBayesianOptimization)
 library(MlBayesOpt)
+library(corrplot)
+#install.packages("corrplot")
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 rm(list=ls())
+
+str(home_train)
+home_train_cor<-cor(home_train)
+corrplot(home_train_cor, method="color")
 #구조확인
 # sum(is.na(home_train))
 # head(home_train)
@@ -97,6 +103,33 @@ str(new_home_test)
 str(home_train)
 xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
 set.seed(1234)
+#원본 train-rmse:32xxx.xxxx
+xgbmodel<-xgboost(data=xgb_train,
+                         label=home_train$price,
+                         eta = 0.05, 
+                         nround = 1000, 
+                         subsample = 0.8, 
+                         colsample_bytree = 0.8, 
+                         seed = 1,
+                         eval_metric = "rmse", 
+                         objective = "reg:linear",
+                         #nthread = 3, 
+                         max_depth = 9)
+
+#####xgboost cross validation
+param_origin<-list(eta=0.2, nround=600, subsample=0.8, colsample_bytree=0.8, seed=1, eval_metric="rmse",
+                   objective="reg:linear",max_depth=10)
+cv_train <- xgb.DMatrix(data = xgb_train,label = home_train$price)
+set.seed(1)
+xgb.cv(param_origin, cv_train, nrounds=4, nfold=5, metrics = {'rmse'})
+
+#######cv2
+cv_train2<-xgb.DMatrix(data=data.matrix(subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
+                                                                    "view","yr_built","zipcode","waterfront","bathrooms","sqft_lot"))),label=home_train$price)
+set.seed(1)
+xgb.cv(param_origin,cv_train2,nrounds = 4,nfold = 5,metrics = {'rmse'})
+
+
 xgbmodel<-xgboost(data=xgb_train,
                   label=home_train$price,
                   eta = 0.104, #gradient descent 알고리즘에서의 learning rate 0.2
@@ -109,28 +142,17 @@ xgbmodel<-xgboost(data=xgb_train,
                   #nthread = 3, 동시 처리 수 이며, 시스템의 코어 수에 대응하여 입력되어야 한다. 모든 코어를 사용하려면, 값을 할당하지 않는다(알고리즘 감지한다).
                   max_depth = 5) #5
 
-#원본 train-rmse:32xxx.xxxx
-xgbmodel<-xgboost(data=xgb_train,
-                  label=home_train$price,
-                  eta = 0.3, 
-                  nround = 600, 
-                  subsample = 0.8, 
-                  colsample_bytree = 0.8, 
-                  seed = 1,
-                  eval_metric = "rmse", 
-                  objective = "reg:linear",
-                  #nthread = 3, 
-                  max_depth = 5)
+
 
 
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(xgbmodel, xgb_test)
 
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_eta_dot3.csv",row.names = FALSE)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_maxdepth9_nrounds1000_eta005.csv",row.names = FALSE)
 #getParma2:eta = 0.104,nround = 600,subsample = 0.765, colsample_bytree = 0.652, seed = 1,eval_metric ="rmse" objective = "reg:linear",max_depth = 5 
 
 #변수중요도 
-var_importance<-xgb.importance(colnames(xgb_train),home_xgb)
+var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
 xgb.plot.importance(var_importance) #xgb자체함수
 
@@ -140,23 +162,23 @@ xgb.plot.importance(var_importance) #xgb자체함수
 
 #변수중요도 토대로 다시 xgboost
 home_train_modify<-subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
-                                                "view","yr_built","zipcode","waterfront"))
+                                                "view","yr_built","zipcode","waterfront","bathrooms","sqft_lot"))
 xgb_train_modify<-data.matrix(home_train_modify)
 xgbmodel_modify<-xgboost(data=xgb_train_modify,
                           label = home_train$price,
-                          eta = 0.104,
-                          nround = 569, 
-                          subsample = 0.666, 
-                          colsample_bytree = 0.468, 
+                          eta = 0.2,
+                          nround = 600, 
+                          subsample = 0.8, 
+                          colsample_bytree = 0.8, 
                           seed = 1,
                           eval_metric = "rmse", 
                           objective = "reg:linear",
                           #nthread = 3, 
-                          max_depth = 7)
+                          max_depth = 9)
 
-xgb_test_modify<-data.matrix(subset(new_home_test, select = c(grade, sqft_living, lat, sqft_above, long, sqft_living15, view, yr_built, zipcode, waterfront)))
+xgb_test_modify<-data.matrix(subset(new_home_test, select = c(grade, sqft_living, lat, sqft_above, long, sqft_living15, view, yr_built, zipcode, waterfront,bathrooms,sqft_lot)))
 new_home_test$price<-predict(xgbmodel_modify, xgb_test_modify)
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_modify_getParam1.csv",row.names = FALSE)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_modify2_getParam2.csv",row.names = FALSE)
 
 
 #############cv, 241이 나왓는데 결과가 더 안좋아짐 ###################
@@ -222,9 +244,9 @@ xg_set$par.vals <- list(
   eval_metric = "rmse"
 )
 xg_ps <- makeParamSet(
-  makeIntegerParam("nrounds",lower=100,upper=1000),
-  makeIntegerParam("max_depth",lower=4,upper=8),
-  makeNumericParam("eta", lower = 0.02, upper = 0.3),
+  makeIntegerParam("nrounds",lower=600,upper=1000), #그냥 고정값으로 하는게 나을거같기도 함 
+  makeIntegerParam("max_depth",lower=6,upper=15), #maxdepth는 높이는게 좋을거같다. 
+  makeNumericParam("eta", lower = 0.01, upper = 0.1), #eta를 낮추는게 좋을거같다.
   makeNumericParam("subsample", lower = 0, upper = 1),
   makeNumericParam("colsample_bytree",lower = 0,upper = 1)
 )
