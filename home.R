@@ -3,17 +3,27 @@ library(dplyr)
 library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
+library(ggmap)
 library(rBayesianOptimization)
 library(MlBayesOpt)
 library(corrplot)
 #install.packages("corrplot")
+#install.packages("ggmap")
+install.packages("tibble")
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 rm(list=ls())
 
-str(home_train)
+#상관관계 
+home_train<-home_train %>%
+  select(-c(id,date))
 home_train_cor<-cor(home_train)
 corrplot(home_train_cor, method="color")
+home_train_cor["price",]
+cor_df<-setNames(data.frame(home_train_cor["price",]),c("cor"))
+cor_df_order<-cor_df[order(cor_df$cor,decreasing = T), ,drop=FALSE]
+view(cor_df_order)
+
 #구조확인
 # sum(is.na(home_train))
 # head(home_train)
@@ -21,21 +31,66 @@ corrplot(home_train_cor, method="color")
 # str(home_train)
 # head(home_train$date,20)
 # head(home_train$date)
+
 # home_train 날짜 전처리
 home_train$year<-as.numeric(substr(home_train$date,1,4))
 home_train$month<-as.numeric(substr(home_train$date,5,6))
 home_train$day<-as.numeric(substr(home_train$date,7,8))
 home_train$weekday<-as.integer(format(as.POSIXct(home_train$date,format="%Y%m%dT000000"),format="%u"))
-home_train<-subset(home_train,select = -c(date))
+home_train<-subset(home_train,select = -c(date,floors))
 
-#home_test 날짜 전처리
 
+#새로운 변수작업 
+home_train<-home_train %>%
+  mutate(yr_renovated_yn=ifelse(yr_renovated!=0,1,0)) %>%
+  # mutate(sqft_basement_yn=ifelse(sqft_basement!=0,1,0)) %>%
+  # mutate(allbathrooms=bedrooms*bathrooms) %>%
+  # mutate(temp=sqft_living/bedrooms) %>%
+  mutate(yr_diff=yr_renovated-yr_built) %>%
+  # mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
+  # mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
+  # mutate(allgrade=grade+waterfront+view+condition) %>%
+  # mutate(grade_waterfront=grade+waterfront) %>%
+  # mutate(grade_view=grade+view) %>%
+  # mutate(grade_condition=grade+condition) %>%
+  # mutate(waterfront_view=waterfront+view) %>%
+  # mutate(waterfront_condition=waterfront+condition) %>%
+  # mutate(view_condition=view+condition) %>%
+  # mutate(grade_waterfront_view=grade+waterfront+view) %>%
+  mutate(grade_waterfront_condition=grade+waterfront+condition)
+  # mutate(waterfront_view_condition=waterfront+view+condition)
+
+
+
+#############################################################
+home_test #날짜 전처리
 home_test$year<-as.numeric(substr(home_test$date,1,4))
 home_test$month<-as.numeric(substr(home_test$date,5,6))
 home_test$day<-as.numeric(substr(home_test$date,7,8))
 home_test$weekday<-as.integer(format(as.POSIXct(home_test$date,format="%Y%m%dT000000"),format="%u"))
-home_test2<-subset(home_test,select = -c(date))
-new_home_test<-home_test2 #계속 연습에 쓰일 new_home_test
+home_test<-subset(home_test,select = -c(date,floors))
+
+
+home_test<-home_test %>%
+  mutate(sqft_basement_yn=ifelse(sqft_basement!=0,1,0)) %>%
+  mutate(allbathrooms=bedrooms*bathrooms) %>%
+  mutate(temp=sqft_living/bedrooms) %>%
+  mutate(yr_diff=yr_renovated-yr_built) %>% 
+  mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
+  mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
+  mutate(allgrade=grade+waterfront+view+condition) %>%
+  #mutate(grade_waterfront=grade+waterfront) %>%
+  #mutate(grade_view=grade+view) %>%
+  #mutate(grade_condition=grade+condition) %>%
+  #mutate(waterfront_view=waterfront+view) %>%
+  #mutate(waterfront_condition=waterfront+condition) %>%
+  #mutate(view_condition=view+condition) %>%
+  #mutate(grade_waterfront_view=grade+waterfront+view) %>%
+  mutate(grade_waterfront_condition=grade+waterfront+condition)
+  #mutate(waterfront_view_condition=waterfront+view+condition)
+
+
+new_home_test<-home_test #계속 연습에 쓰일 new_home_test
 
 
 #########################################################################################################
@@ -100,34 +155,49 @@ new_home_test$sqft_lot15<-as.numeric(new_home_test$sqft_lot15)
 str(new_home_test)
 ################################################################################
 
-str(home_train)
 xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
-set.seed(1234)
+
 #원본 train-rmse:32xxx.xxxx
+set.seed(1234)
 xgbmodel<-xgboost(data=xgb_train,
                          label=home_train$price,
-                         eta = 0.05, 
-                         nround = 1000, 
-                         subsample = 0.8, 
-                         colsample_bytree = 0.8, 
-                         seed = 1,
+                         eta = 0.2, 
+                         nround = 300, 
+                         subsample = 1, #(0,1] default 1
+                         colsample_bytree = 0.8,#(0,1] default 1
                          eval_metric = "rmse", 
                          objective = "reg:linear",
                          #nthread = 3, 
-                         max_depth = 9)
+                         max_depth = 11)
+
+var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
+ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
+xgb.plot.importance(var_importance)
+#ggplot(data = var_importance, aes(x = reorder(Feature, Cover), y = Cover)) +geom_bar(stat = 'identity')+coord_flip()
+options("scipen" = 100)
+var_importance[order(var_importance$Gain,decreasing = T),]
+var_importance$Frequency
 
 #####xgboost cross validation
-param_origin<-list(eta=0.2, nround=600, subsample=0.8, colsample_bytree=0.8, seed=1, eval_metric="rmse",
-                   objective="reg:linear",max_depth=10)
 cv_train <- xgb.DMatrix(data = xgb_train,label = home_train$price)
+param_origin<-list(eta=0.2, subsample=1, colsample_bytree=0.8, max_depth=11, eval_metric="rmse", objective="reg:linear")
 set.seed(1)
-xgb.cv(param_origin, cv_train, nrounds=4, nfold=5, metrics = {'rmse'})
+temp<-xgb.cv(param_origin, cv_train, nrounds=30, nfold=5, metrics = {'rmse'})
 
-#######cv2
+#cv_train2<-xgb.DMatrix(data=subset(xgb_train,select = c(grade_waterfront_condition,sqft_living,lat)),label=home_train$price)
+
+temp$best_iteration #early_stopping_rounds 줄때만가능
+home_train$bathrooms
+
+####################cv2####################################
 cv_train2<-xgb.DMatrix(data=data.matrix(subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
                                                                     "view","yr_built","zipcode","waterfront","bathrooms","sqft_lot"))),label=home_train$price)
+hist(home_train$waterfront)
 set.seed(1)
-xgb.cv(param_origin,cv_train2,nrounds = 4,nfold = 5,metrics = {'rmse'})
+xgb.cv(param_origin,cv_train2,nrounds = 1000,nfold = 5,metrics = {'rmse'},early_stopping_rounds = 700)
+############################################################
+
+
 
 
 xgbmodel<-xgboost(data=xgb_train,
@@ -144,11 +214,10 @@ xgbmodel<-xgboost(data=xgb_train,
 
 
 
-
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(xgbmodel, xgb_test)
-
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_maxdepth9_nrounds1000_eta005.csv",row.names = FALSE)
+#head(new_home_test$price)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_0322.csv",row.names = FALSE)
 #getParma2:eta = 0.104,nround = 600,subsample = 0.765, colsample_bytree = 0.652, seed = 1,eval_metric ="rmse" objective = "reg:linear",max_depth = 5 
 
 #변수중요도 

@@ -42,7 +42,8 @@ for(i in 1:144368){
 head(df)
 
 write.csv(df,file="otto_submission.csv",row.names = FALSE)
-' 변환작업 테스트
+' 
+변환작업 테스트
 #df아이디하고 otto아이디하고 같을때 otto아이디의 타겟값의 컬럼을 1로 바꾼다
 colname<-otto_test[1,c("target")]
 colname<-as.character(colname)
