@@ -3,6 +3,7 @@ library(dplyr)
 library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
+library(ggmap)
 library(rBayesianOptimization)
 library(MlBayesOpt)
 library(corrplot)
