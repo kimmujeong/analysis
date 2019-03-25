@@ -3,26 +3,25 @@ library(dplyr)
 library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
-library(ggmap)
 library(rBayesianOptimization)
 library(MlBayesOpt)
 library(corrplot)
 #install.packages("corrplot")
 #install.packages("ggmap")
-install.packages("tibble")
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 rm(list=ls())
 
-#상관관계 
-home_train<-home_train %>%
-  select(-c(id,date))
-home_train_cor<-cor(home_train)
-corrplot(home_train_cor, method="color")
-home_train_cor["price",]
-cor_df<-setNames(data.frame(home_train_cor["price",]),c("cor"))
-cor_df_order<-cor_df[order(cor_df$cor,decreasing = T), ,drop=FALSE]
-view(cor_df_order)
+################################################
+########################상관관계###############
+# home_train<-home_train %>%
+#   select(-c(id,date))
+# home_train_cor<-cor(home_train)
+# corrplot(home_train_cor, method="color")
+# home_train_cor["price",]
+# cor_df<-setNames(data.frame(home_train_cor["price",]),c("cor"))
+# cor_df_order<-cor_df[order(cor_df$cor,decreasing = T), ,drop=FALSE]
+# view(cor_df_order)
 
 #구조확인
 # sum(is.na(home_train))
@@ -31,6 +30,14 @@ view(cor_df_order)
 # str(home_train)
 # head(home_train$date,20)
 # head(home_train$date)
+################################################
+
+#정규화
+home_train$bedrooms<-log1p(home_train$bedrooms)
+home_train$sqft_living<-log1p(home_train$sqft_living)
+home_train$sqft_lot<-log1p(home_train$sqft_lot)
+home_train$sqft_above<-log1p(home_train$sqft_above)
+home_train$sqft_basement<-log1p(home_train$sqft_basement)
 
 # home_train 날짜 전처리
 home_train$year<-as.numeric(substr(home_train$date,1,4))
@@ -42,28 +49,28 @@ home_train<-subset(home_train,select = -c(date,floors))
 
 #새로운 변수작업 
 home_train<-home_train %>%
-  mutate(yr_renovated_yn=ifelse(yr_renovated!=0,1,0)) %>%
-  # mutate(sqft_basement_yn=ifelse(sqft_basement!=0,1,0)) %>%
-  # mutate(allbathrooms=bedrooms*bathrooms) %>%
-  # mutate(temp=sqft_living/bedrooms) %>%
   mutate(yr_diff=yr_renovated-yr_built) %>%
-  # mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
-  # mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
-  # mutate(allgrade=grade+waterfront+view+condition) %>%
-  # mutate(grade_waterfront=grade+waterfront) %>%
-  # mutate(grade_view=grade+view) %>%
-  # mutate(grade_condition=grade+condition) %>%
-  # mutate(waterfront_view=waterfront+view) %>%
-  # mutate(waterfront_condition=waterfront+condition) %>%
-  # mutate(view_condition=view+condition) %>%
-  # mutate(grade_waterfront_view=grade+waterfront+view) %>%
+  mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
+  mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
+  mutate(allgrade=grade+waterfront+view+condition) %>%
+  mutate(grade_waterfront=grade+waterfront) %>%
+  mutate(grade_view=grade+view) %>%
+  mutate(grade_condition=grade+condition) %>%
+  mutate(waterfront_view=waterfront+view) %>%
+  mutate(view_condition=view+condition) %>%
+  mutate(grade_waterfront_view=grade+waterfront+view) %>%
   mutate(grade_waterfront_condition=grade+waterfront+condition)
-  # mutate(waterfront_view_condition=waterfront+view+condition)
 
 
 
 #############################################################
-home_test #날짜 전처리
+home_test$bedrooms<-log1p(home_test$bedrooms)
+home_test$sqft_living<-log1p(home_test$sqft_living)
+home_test$sqft_lot<-log1p(home_test$sqft_lot)
+home_test$sqft_above<-log1p(home_test$sqft_above)
+home_test$sqft_basement<-log1p(home_test$sqft_basement)
+
+#날짜 전처리
 home_test$year<-as.numeric(substr(home_test$date,1,4))
 home_test$month<-as.numeric(substr(home_test$date,5,6))
 home_test$day<-as.numeric(substr(home_test$date,7,8))
@@ -72,23 +79,17 @@ home_test<-subset(home_test,select = -c(date,floors))
 
 
 home_test<-home_test %>%
-  mutate(sqft_basement_yn=ifelse(sqft_basement!=0,1,0)) %>%
-  mutate(allbathrooms=bedrooms*bathrooms) %>%
-  mutate(temp=sqft_living/bedrooms) %>%
-  mutate(yr_diff=yr_renovated-yr_built) %>% 
+  mutate(yr_diff=yr_renovated-yr_built) %>%
   mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
   mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
   mutate(allgrade=grade+waterfront+view+condition) %>%
-  #mutate(grade_waterfront=grade+waterfront) %>%
-  #mutate(grade_view=grade+view) %>%
-  #mutate(grade_condition=grade+condition) %>%
-  #mutate(waterfront_view=waterfront+view) %>%
-  #mutate(waterfront_condition=waterfront+condition) %>%
-  #mutate(view_condition=view+condition) %>%
-  #mutate(grade_waterfront_view=grade+waterfront+view) %>%
-  mutate(grade_waterfront_condition=grade+waterfront+condition)
-  #mutate(waterfront_view_condition=waterfront+view+condition)
-
+  mutate(grade_waterfront=grade+waterfront) %>%
+  mutate(grade_view=grade+view) %>%
+  mutate(grade_condition=grade+condition) %>%
+  mutate(waterfront_view=waterfront+view) %>%
+  mutate(view_condition=view+condition) %>%
+  mutate(grade_waterfront_view=grade+waterfront+view) %>%
+  mutate(grade_waterfront_condition=grade+waterfront+condition) %>%
 
 new_home_test<-home_test #계속 연습에 쓰일 new_home_test
 
@@ -158,17 +159,17 @@ str(new_home_test)
 xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
 
 #원본 train-rmse:32xxx.xxxx
-set.seed(1234)
+set.seed(1)
 xgbmodel<-xgboost(data=xgb_train,
                          label=home_train$price,
-                         eta = 0.2, 
-                         nround = 300, 
-                         subsample = 1, #(0,1] default 1
-                         colsample_bytree = 0.8,#(0,1] default 1
+                         eta = 0.0564, 
+                         nround = 649, 
+                         subsample = 0.621, #(0,1] default 1
+                         colsample_bytree = 0.925,#(0,1] default 1
                          eval_metric = "rmse", 
                          objective = "reg:linear",
                          #nthread = 3, 
-                         max_depth = 11)
+                         max_depth = 9)
 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
@@ -180,26 +181,54 @@ var_importance$Frequency
 
 #####xgboost cross validation
 cv_train <- xgb.DMatrix(data = xgb_train,label = home_train$price)
-param_origin<-list(eta=0.2, subsample=1, colsample_bytree=0.8, max_depth=11, eval_metric="rmse", objective="reg:linear")
+param_origin<-list(eta=0.0564, subsample=0.621, colsample_bytree=0.925, max_depth=9, eval_metric="rmse", objective="reg:linear")
 set.seed(1)
-temp<-xgb.cv(param_origin, cv_train, nrounds=30, nfold=5, metrics = {'rmse'})
-
-#cv_train2<-xgb.DMatrix(data=subset(xgb_train,select = c(grade_waterfront_condition,sqft_living,lat)),label=home_train$price)
-
+temp<-xgb.cv(param_origin, cv_train, nrounds=649, nfold=5, metrics = {'rmse'})
 temp$best_iteration #early_stopping_rounds 줄때만가능
-home_train$bathrooms
 
-####################cv2####################################
-cv_train2<-xgb.DMatrix(data=data.matrix(subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
-                                                                    "view","yr_built","zipcode","waterfront","bathrooms","sqft_lot"))),label=home_train$price)
-hist(home_train$waterfront)
+'
+all변수(새로추가한거)
+[Tune] Result: nrounds=793; max_depth=12; eta=0.0279; subsample=0.384; colsample_bytree=0.578 : rmse.test.rmse=127174.7663617
+변수제거후
+[Tune] Result: nrounds=712; max_depth=6; eta=0.0271; subsample=0.621; colsample_bytree=0.411 : rmse.test.rmse=122431.5425037
+변수제거후2
+[Tune] Result: nrounds=717; max_depth=6; eta=0.0234; subsample=0.34; colsample_bytree=0.509 : rmse.test.rmse=129140.1565169
+'
+
+
+########################
+#####rmse 비교하기######
+cv_train <- xgb.DMatrix(data = data.matrix(subset(home_train,select = -c(id,price))),label = home_train$price)
+param_origin<-list(eta=0.0279, subsample=0.384, colsample_bytree=0.578, max_depth=12, eval_metric="rmse", objective="reg:linear")
 set.seed(1)
-xgb.cv(param_origin,cv_train2,nrounds = 1000,nfold = 5,metrics = {'rmse'},early_stopping_rounds = 700)
-############################################################
+temp<-xgb.cv(param_origin, cv_train, nrounds=793, nfold=5, metrics = {'rmse'})
+#[793]	train-rmse:17889.676953+1236.593746	test-rmse:126051.956250+10985.884124
+#제출결과 117652.86935
 
 
+cv_train <- xgb.DMatrix(data = data.matrix(subset(home_train,select = -c(id,price,temp,yr_renovated_yn,waterfront_condition,sqft_basement_yn,year,waterfront_view_condition,view_condition))),label = home_train$price)
+param_origin<-list(eta=0.0271, subsample=0.621, colsample_bytree=0.411, max_depth=6, eval_metric="rmse", objective="reg:linear")
+set.seed(1)
+temp<-xgb.cv(param_origin, cv_train, nrounds=712, nfold=5, metrics = {'rmse'})
+#param_origin<-list(eta=0.0271, subsample=0.621, colsample_bytree=0.411, max_depth=6, eval_metric="rmse", objective="reg:linear")
+#[712]	train-rmse:59035.739844+510.934671	test-rmse:123408.318750+11218.019143 
+#제출결과 114644.16264
 
+cv_train <- xgb.DMatrix(data = data.matrix(subset(home_train,select = -c(id,price,temp,yr_renovated_yn,waterfront_condition,sqft_basement_yn,year,waterfront_view_condition,view_condition,condition,weekday,yr_renovated,view,waterfront,bedrooms,day,month,sqft_lot_diff,waterfront_view))),label = home_train$price)
+param_origin<-list(eta=0.0234, subsample=0.34, colsample_bytree=0.509, max_depth=6, eval_metric="rmse", objective="reg:linear")
+set.seed(1)
+temp<-xgb.cv(param_origin, cv_train, nrounds=717, nfold=5, metrics = {'rmse'})
+#[717]	train-rmse:77620.051562+1371.319299	test-rmse:131382.737500+9469.940710 
+#제출결과 118656.08708
 
+#[649]	train-rmse:10935.682031+660.460854	test-rmse:126627.279688+15998.074166 
+#제출결과 114361.07623
+
+#영향력 낮은 변수제거 후... 제출파일은 안만들었음(시간오버) 
+#[649]	train-rmse:10959.287110+457.780943	test-rmse:125801.221875+13574.826347
+######################
+
+##########################################
 xgbmodel<-xgboost(data=xgb_train,
                   label=home_train$price,
                   eta = 0.104, #gradient descent 알고리즘에서의 learning rate 0.2
@@ -211,43 +240,19 @@ xgbmodel<-xgboost(data=xgb_train,
                   objective = "reg:linear",
                   #nthread = 3, 동시 처리 수 이며, 시스템의 코어 수에 대응하여 입력되어야 한다. 모든 코어를 사용하려면, 값을 할당하지 않는다(알고리즘 감지한다).
                   max_depth = 5) #5
-
-
+##########################################
 
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(xgbmodel, xgb_test)
-#head(new_home_test$price)
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_0322.csv",row.names = FALSE)
-#getParma2:eta = 0.104,nround = 600,subsample = 0.765, colsample_bytree = 0.652, seed = 1,eval_metric ="rmse" objective = "reg:linear",max_depth = 5 
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_log.csv",row.names = FALSE)
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
 xgb.plot.importance(var_importance) #xgb자체함수
 
-'grade, sqft_living, lat, sqft_above, long, sqft_living15, view, yr_built, zipcode(?), waterfront
-정도까지 의미있는 것으로 파악됨
-'
 
-#변수중요도 토대로 다시 xgboost
-home_train_modify<-subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
-                                                "view","yr_built","zipcode","waterfront","bathrooms","sqft_lot"))
-xgb_train_modify<-data.matrix(home_train_modify)
-xgbmodel_modify<-xgboost(data=xgb_train_modify,
-                          label = home_train$price,
-                          eta = 0.2,
-                          nround = 600, 
-                          subsample = 0.8, 
-                          colsample_bytree = 0.8, 
-                          seed = 1,
-                          eval_metric = "rmse", 
-                          objective = "reg:linear",
-                          #nthread = 3, 
-                          max_depth = 9)
 
-xgb_test_modify<-data.matrix(subset(new_home_test, select = c(grade, sqft_living, lat, sqft_above, long, sqft_living15, view, yr_built, zipcode, waterfront,bathrooms,sqft_lot)))
-new_home_test$price<-predict(xgbmodel_modify, xgb_test_modify)
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_modify2_getParam2.csv",row.names = FALSE)
 
 
 #############cv, 241이 나왓는데 결과가 더 안좋아짐 ###################
@@ -316,50 +321,35 @@ xg_ps <- makeParamSet(
   makeIntegerParam("nrounds",lower=600,upper=1000), #그냥 고정값으로 하는게 나을거같기도 함 
   makeIntegerParam("max_depth",lower=6,upper=15), #maxdepth는 높이는게 좋을거같다. 
   makeNumericParam("eta", lower = 0.01, upper = 0.1), #eta를 낮추는게 좋을거같다.
-  makeNumericParam("subsample", lower = 0, upper = 1),
-  makeNumericParam("colsample_bytree",lower = 0,upper = 1)
+  makeNumericParam("subsample", lower = 0.5, upper = 1),
+  makeNumericParam("colsample_bytree",lower = 0.5,upper = 1)
 )
-rancontrol <- makeTuneControlRandom(maxit = 30L) #40L부터 시간좀걸림
+rancontrol <- makeTuneControlRandom(maxit = 10L) #40L부터 시간좀걸림
 set_cv <- makeResampleDesc("CV",iters = 3L)
-home_train<-subset(home_train,select = -c(date))
+home_train<-subset(home_train,select=-c(id))
 trainTask <- makeRegrTask(data = home_train,target = "price")
 #trainTask <- normalizeFeatures(trainTask,method = "standardize")
-set.seed(1234)
+set.seed(1)
 xg_tune <- tuneParams(learner = xg_set, task = trainTask, resampling = set_cv,measures = rmse, par.set = xg_ps, control = rancontrol)
 
 
 
 
-####변수재지정 파라미터설정
-home_train_modify_temp<-subset(home_train,select = c("grade","sqft_living","lat","sqft_above","long","sqft_living15",
-                                                "view","yr_built","zipcode","waterfront","price"))
-trainTask_modify<-makeRegrTask(data=home_train_modify_temp,target = "price")
-xg_tune <- tuneParams(learner = xg_set, task = trainTask_modify, resampling = set_cv,measures = rmse, par.set = xg_ps, control = rancontrol)
+
+
+
+
+
+##################################################################################################
+##################################################################################################
 "
-[Tune-y] 30: rmse.test.rmse=154751.4441560; time: 0.2 min
-[Tune] Result: nrounds=569; max_depth=7; eta=0.074; subsample=0.666; colsample_bytree=0.468 : rmse.test.rmse=125862.8476825
-"
 
-
-
-
-
-
-
-
-'
 https://3months.tistory.com/118
 validation 하기...
-'
 
+중요변수(3~4개)를 다 합쳐보기
 
-
-##################################################################################################
-##################################################################################################
-#중요변수(3~4개)를 다 합쳐보기
-
-
-"
-predict할때 컬럼이 맞아야 
+predict할때 컬럼이 맞아야
 xgb모델에서 eval_metric을 mae로 했었다가 rmse로 바꾸니 훨씬 좋아졌다. 맞는 방법으로 해야된다..
+
 "
