@@ -32,7 +32,7 @@ rm(list=ls())
 # head(home_train$date,20)
 # head(home_train$date)
 ################################################
-
+colnames(home_train)
 #정규화
 home_train$bedrooms<-log1p(home_train$bedrooms)
 home_train$sqft_living<-log1p(home_train$sqft_living)
@@ -41,24 +41,24 @@ home_train$sqft_above<-log1p(home_train$sqft_above)
 home_train$sqft_basement<-log1p(home_train$sqft_basement)
 
 # home_train 날짜 전처리
-home_train$year<-as.numeric(substr(home_train$date,1,4))
-home_train$month<-as.numeric(substr(home_train$date,5,6))
-home_train$day<-as.numeric(substr(home_train$date,7,8))
-home_train$weekday<-as.integer(format(as.POSIXct(home_train$date,format="%Y%m%dT000000"),format="%u"))
+# home_train$year<-as.numeric(substr(home_train$date,1,4))
+# home_train$month<-as.numeric(substr(home_train$date,5,6))
+# home_train$day<-as.numeric(substr(home_train$date,7,8))
+# home_train$weekday<-as.integer(format(as.POSIXct(home_train$date,format="%Y%m%dT000000"),format="%u"))
 home_train<-subset(home_train,select = -c(date,floors))
 
 
-#새로운 변수작업 
+#새로운 변수작업
 home_train<-home_train %>%
   mutate(yr_diff=yr_renovated-yr_built) %>%
   mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
-  mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
+  #mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
   mutate(allgrade=grade+waterfront+view+condition) %>%
   mutate(grade_waterfront=grade+waterfront) %>%
   mutate(grade_view=grade+view) %>%
-  mutate(grade_condition=grade+condition) %>%
-  mutate(waterfront_view=waterfront+view) %>%
-  mutate(view_condition=view+condition) %>%
+  # mutate(grade_condition=grade+condition) %>%
+  # mutate(waterfront_view=waterfront+view) %>%
+  # mutate(view_condition=view+condition) %>%
   mutate(grade_waterfront_view=grade+waterfront+view) %>%
   mutate(grade_waterfront_condition=grade+waterfront+condition)
 
@@ -72,25 +72,25 @@ home_test$sqft_above<-log1p(home_test$sqft_above)
 home_test$sqft_basement<-log1p(home_test$sqft_basement)
 
 #날짜 전처리
-home_test$year<-as.numeric(substr(home_test$date,1,4))
-home_test$month<-as.numeric(substr(home_test$date,5,6))
-home_test$day<-as.numeric(substr(home_test$date,7,8))
-home_test$weekday<-as.integer(format(as.POSIXct(home_test$date,format="%Y%m%dT000000"),format="%u"))
+# home_test$year<-as.numeric(substr(home_test$date,1,4))
+# home_test$month<-as.numeric(substr(home_test$date,5,6))
+# home_test$day<-as.numeric(substr(home_test$date,7,8))
+# home_test$weekday<-as.integer(format(as.POSIXct(home_test$date,format="%Y%m%dT000000"),format="%u"))
 home_test<-subset(home_test,select = -c(date,floors))
 
 
 home_test<-home_test %>%
   mutate(yr_diff=yr_renovated-yr_built) %>%
   mutate(sqft_living_diff=sqft_living15-sqft_living) %>%
-  mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
+  #mutate(sqft_lot_diff=sqft_lot15-sqft_lot) %>%
   mutate(allgrade=grade+waterfront+view+condition) %>%
   mutate(grade_waterfront=grade+waterfront) %>%
   mutate(grade_view=grade+view) %>%
-  mutate(grade_condition=grade+condition) %>%
-  mutate(waterfront_view=waterfront+view) %>%
-  mutate(view_condition=view+condition) %>%
+  #mutate(grade_condition=grade+condition) %>%
+  #mutate(waterfront_view=waterfront+view) %>%
+  #mutate(view_condition=view+condition) %>%
   mutate(grade_waterfront_view=grade+waterfront+view) %>%
-  mutate(grade_waterfront_condition=grade+waterfront+condition) %>%
+  mutate(grade_waterfront_condition=grade+waterfront+condition)
 
 new_home_test<-home_test #계속 연습에 쓰일 new_home_test
 
@@ -163,14 +163,14 @@ xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
 set.seed(1)
 xgbmodel<-xgboost(data=xgb_train,
                          label=home_train$price,
-                         eta = 0.0564, 
-                         nround = 649, 
-                         subsample = 0.621, #(0,1] default 1
-                         colsample_bytree = 0.925,#(0,1] default 1
-                         eval_metric = "rmse", 
+                         eta = 0.0866,
+                         nround = 958,
+                         subsample = 0.765, #(0,1] default 1
+                         colsample_bytree = 0.72,#(0,1] default 1
+                         eval_metric = "rmse",
                          objective = "reg:linear",
-                         #nthread = 3, 
-                         max_depth = 9)
+                         #nthread = 3,
+                         max_depth = 6)
 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
@@ -182,9 +182,9 @@ var_importance$Frequency
 
 #####xgboost cross validation
 cv_train <- xgb.DMatrix(data = xgb_train,label = home_train$price)
-param_origin<-list(eta=0.0564, subsample=0.621, colsample_bytree=0.925, max_depth=9, eval_metric="rmse", objective="reg:linear")
+param_origin<-list(eta=0.0513, subsample=0.69, colsample_bytree=0.724, max_depth=8, eval_metric="rmse", objective="reg:linear")
 set.seed(1)
-temp<-xgb.cv(param_origin, cv_train, nrounds=649, nfold=5, metrics = {'rmse'})
+temp<-xgb.cv(param_origin, cv_train, nrounds=687, nfold=5, metrics = {'rmse'})
 temp$best_iteration #early_stopping_rounds 줄때만가능
 
 '
@@ -245,14 +245,12 @@ xgbmodel<-xgboost(data=xgb_train,
 
 xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
 new_home_test$price<-predict(xgbmodel, xgb_test)
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_log.csv",row.names = FALSE)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_0327_2.csv",row.names = FALSE)
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
 xgb.plot.importance(var_importance) #xgb자체함수
-
-
 
 
 
@@ -330,7 +328,7 @@ set_cv <- makeResampleDesc("CV",iters = 3L)
 home_train<-subset(home_train,select=-c(id))
 trainTask <- makeRegrTask(data = home_train,target = "price")
 #trainTask <- normalizeFeatures(trainTask,method = "standardize")
-set.seed(1)
+#set.seed(1)
 xg_tune <- tuneParams(learner = xg_set, task = trainTask, resampling = set_cv,measures = rmse, par.set = xg_ps, control = rancontrol)
 
 
