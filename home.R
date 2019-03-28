@@ -163,9 +163,9 @@ xgb_train<-data.matrix(subset(home_train,select = -c(id,price)))
 set.seed(1)
 xgbmodel<-xgboost(data=xgb_train,
                          label=home_train$price,
-                         eta = 0.0866,
-                         nround = 958,
-                         subsample = 0.765, #(0,1] default 1
+                         eta = 0.0238,
+                         nround = 932,
+                         subsample = 0.636, #(0,1] default 1
                          colsample_bytree = 0.72,#(0,1] default 1
                          eval_metric = "rmse",
                          objective = "reg:linear",
@@ -243,9 +243,9 @@ xgbmodel<-xgboost(data=xgb_train,
                   max_depth = 5) #5
 ##########################################
 
-xgb_test<-data.matrix(subset(new_home_test, select = -c(id)))
+xgb_test<-data.matrix(subset(new_home_test, select = -c(id,price)))
 new_home_test$price<-predict(xgbmodel, xgb_test)
-write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_0327_2.csv",row.names = FALSE)
+write.csv(new_home_test[,c("id","price")],file="home_xgb_rmse_0328_2.csv",row.names = FALSE)
 
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)

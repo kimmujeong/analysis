@@ -79,9 +79,19 @@ orders %>%
 #알고리즘
 #order_products__train에서 재구매여부 연관성 아이템 찾아보기
 #데이터 형태를 바꿔야할것같음 희소행렬로..
-
+head(order_products__train,20)
 #데이터변환
-order_products__train_list<-split(order_products__train$order_id,order_products__train$product_id,order_products__train$add_to_cart_order,order_products__train$reordered)
-order_products__train_trans<-as(order_products__train_list,"transactions")
-rules <- apriori(data = order_products__train_trans, parameter = list(support = 0.01, confidence = 0.8, minlen = 1))
-summary(rules)
+order_baskets<-order_products__train %>% 
+  inner_join(products, by="product_id") %>% 
+  group_by(order_id) %>%
+  summarise(basket = as.vector(list(product_name)))
+
+# test<-data.frame()
+# row<-distinct(order_products__train,order_id) #중복값 제거
+# col<-distinct(order_products__train,product_id) #중복값 제거
+
+
+# order_products__train_list<-split(order_products__train$order_id,order_products__train$product_id,order_products__train$add_to_cart_order,order_products__train$reordered)
+# order_products__train_trans<-as(order_products__train_list,"transactions")
+# rules <- apriori(data = order_products__train_trans, parameter = list(support = 0.01, confidence = 0.8, minlen = 1))
+# summary(rules)
