@@ -3,6 +3,7 @@
 library(dplyr)
 library(ggplot2)
 library(arules) #연관분석
+library(arulesSequences)
 library(Matrix)
 library(arulesViz)
 library(RColorBrewer)
@@ -11,7 +12,8 @@ library(splitstackshape)
 #install.packages("tidyverse")
 #install.packages("arulesViz")
 #install.packages("RColorBrewer")
-install.packages("splitstackshape")
+#install.packages("splitstackshape")
+#install.packages("arulesSequences")
 aisles<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\aisles.csv")
 departments<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\departments.csv")
 order_products__prior<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__prior.csv")
@@ -20,7 +22,6 @@ orders<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\
 products<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\products.csv")
 
 
-mydata<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__prior.csv",nrow=20000)
 
 rm(list=ls())
 
@@ -86,7 +87,7 @@ orders %>%
 ####################################################
 
 
-#알고리즘
+#연관분석
 #train파일로 하면 규칙이 안나온다.. prior파일로 실행했음..
 sample<-order_products__prior[1:20000,]
 sample_join<-sample %>%
@@ -116,16 +117,59 @@ plot(subrules2, method="graph",control=list(type="items",main=""))
 
 
 #####kaggle 연습
-rules_test<-apriori(sample_join_transactions, parameter=list(support=0.001, confidence=0.8),appearance = list(default="lhs",rhs="Banana"),control = list(verbose=F))
+rules_test<-apriori(sample_join_transactions, parameter=list(support=0.001, confidence=0.8),
+                    appearance = list(default="lhs",rhs="Banana"),
+                    control = list(verbose=F))
 rules_test<-sort(rules_test, decreasing=TRUE,by="confidence")
 plot_data<-head(sort(rules_test, by ="lift"),5)
 plot(plot_data, method = "graph",control=list(type="items",main=""))
 
+#####재주문했을 경우에 규칙찾기
+####group_by에서 reordered ==1 일경우를 추가해서 규칙찾고 이전 규칙하고 비교해보기
+head(sample_join)
+reordered_sample<-sample_join %>%
+  filter(reordered==1)
+head(reordered_sample)
+reordered_sample_split<-split(reordered_sample$product_name,reordered_sample$order_id)
+reordered_sample_transations<-as(reordered_sample_split,"transactions")
+reordered_rule<-apriori(reordered_sample_transations,parameter = list(support=0.001, confidence=0.8, minlen = 3))
+inspect(reordered_rule[1:10])
 
+################
 ###순차분석
+head(sample,10)
+sample<-rename(sample,sequenceID=add_to_cart_order)
+sample<-rename(sample,eventID=order_id)
+sample_split<-split(sample$product_id,sample$sequenceID)
+sample_transactions<-as(sample_split,"transactions")
+inspect(sample_transactions[60])
+nrow(sample_transactions)
+inspect(sample_transactions[61])
 
+sample_transactions<-rename(sample_transactions,sequenceID=transactionID)
+transaction_df<-as(sample_transactions,"data.frame")
+transaction_df[60,]
+transaction_df<-rename(transaction_df,sequenceID=transactionID)
+re_trans<-as(transaction_df,"transactions")
+inspect(re_trans[60])
 
+df<-data.frame(matrix(nrow=61,ncol = 2))
+df$X1<-1:61
+df$X2<-transaction_df$items
+df<-rename(df,sequenceID=X1,items=X2)
 
+write.table(df, file="myTemp.csv", sep = ",", row.names = F, col.names = F, quote=F)
+t <- read_baskets("myTemp.csv", sep=",",info = c("sequenceID"))
+inspect(t[60])
+seq_rule_1 <- cspade(t, parameter=list(support=0.3, maxsize=5, maxlen=4), control=list(verbose=TRUE))
+
+data(zaki)
+inspect(zaki)
+inspect(sample_transactions[60])
+head(sample)
+################
+
+###################잡
 # test<-data.frame(matrix(nrow=131209,ncol=39123))
 # row<-distinct(order_products__train,order_id) #중복값 제거
 # col<-distinct(order_products__train,product_id) #중복값 제거
