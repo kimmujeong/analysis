@@ -6,36 +6,42 @@ library(arules) #연관분석
 library(arulesSequences)
 library(Matrix)
 library(arulesViz)
+library(tidyr)
+library(tibble) #remove_rownames
+library(gridExtra)
+library(recommenderlab)
 library(RColorBrewer)
 library(splitstackshape)
+require('gridExtra')
 #install.packages("arules")
 #install.packages("tidyverse")
 #install.packages("arulesViz")
 #install.packages("RColorBrewer")
 #install.packages("splitstackshape")
 #install.packages("arulesSequences")
+#install.packages("recommenderlab")
+install.packages("gridExtra")
 aisles<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\aisles.csv")
 departments<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\departments.csv")
 order_products__prior<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__prior.csv")
 order_products__train<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__train.csv")
 orders<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\orders.csv")
 products<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\products.csv")
-
+sample<-order_products__prior[1:20000,]
 
 
 rm(list=ls())
 
 head(departments) #대분류 21행
 head(aisles,20) #중분류 134행
-head(order_products__prior,20) #prior 정보, add_to_cart_order:장바구니 추가순서 reordered:재구매여부 
+head(order_products__prior,15) #prior 정보, add_to_cart_order:장바구니 추가순서 reordered:재구매여부 
 head(order_products__train) #train 정보, add_to_cart_order:장바구니 추가순서, reordered:재구매여부
-head(orders,20) #prior, train, test 정보 모두 포함 #order_number:주문갯수, order_dow:요일 order_hour_of_day:시간 days_since_prior_order:재주문에 걸린 일수 
+head(orders,15) #prior, train, test 정보 모두 포함 #order_number:주문갯수, order_dow:요일 order_hour_of_day:시간 days_since_prior_order:재주문에 걸린 일수 
 head(products) #상품정보
 
-#EDA과정
+#################EDA과정##########################
 
-####################################################
-#order_products_train에서 재구매 횟수가 높은 상품확인
+####order_products_train에서 재구매 횟수가 높은 상품확인####
 train_reordered_df<-order_products__train %>%
   group_by(product_id) %>%
   filter(reordered==1) %>%
@@ -48,8 +54,8 @@ products[train_reordered_top10,]
 filter(products, product_id %in% train_reordered_top10) #filter를 사용해서도 할 수 있음. 내가 원하는 순서대로 정렬은 못함 
 ####################################################
 
-####################################################
-#order_products_train에서 재구매 횟수가 낮은 상품확인
+
+####order_products_train에서 재구매 횟수가 낮은 상품확인####
 train_reordered_no_df<-order_products__train %>%
   group_by(product_id) %>%
   filter(reordered==0) %>%
@@ -60,8 +66,8 @@ train_reordered_no_top10<-head(train_reordered_no_df$product_id,10)
 products[train_reordered_no_top10,]
 ####################################################
 
-####################################################
-#order_products_train에서 재구매 확률이 높은 상품확인
+
+#####order_products_train에서 재구매 확률이 높은 상품확인####
 head(order_products__train[order(order_products__train$product_id),])
 order_products__train %>%
   group_by(product_id) %>%
@@ -71,23 +77,79 @@ order_products__train %>%
   left_join(products,by="product_id")
 ####################################################
 
-####################################################
-#어느 요일에 제일 많이 구매하는지
+
+#####어느 요일에 제일 많이 구매하는지####
 options("scipen" = 100)
 orders %>%
   group_by(order_dow) %>%
   ggplot(aes(x=order_dow))+geom_bar()
 ####################################################
 
-####################################################
-#어느 시간에 제일 많이 구매하는지
+
+#####어느 시간에 제일 많이 구매하는지####
 orders %>%
-  group_by(order_hour_of_day) %>%
   ggplot(aes(x=order_hour_of_day))+geom_bar()
 ####################################################
 
 
-#연관분석
+#############요일별 구매시간 패턴###################
+par(mfrow=c(4,2))
+p1<-orders %>%
+  filter(order_dow==0) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p1")
+
+p2<-orders %>%
+  filter(order_dow==1) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p2")
+
+p3<-orders %>%
+  filter(order_dow==2) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p3")
+
+p4<-orders %>%
+  filter(order_dow==3) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p4")
+
+p5<-orders %>%
+  filter(order_dow==4) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p5")
+
+p6<-orders %>%
+  filter(order_dow==5) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p6")
+
+p7<-orders %>%
+  filter(order_dow==6) %>%
+  ggplot(aes(x=order_hour_of_day))+geom_bar()+ggtitle("p7")
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, ncol=4)
+####################################################
+
+
+#############첫 구매에 많이 선택하는 목록#############
+head(order_products__prior)
+order_products__prior<-order_products__prior %>%
+  left_join(products,by="product_id")
+order_products__prior %>%
+  filter(add_to_cart_order==1) %>%
+  count(product_name) %>%
+  arrange(desc(n))
+####################################################
+
+#첫 구매에 많이 선택하는 목록하고 총구매 목록하고 비교..
+#############
+####################################################
+
+
+#############
+####################################################
+
+
+#############
+####################################################
+
+
+#####연관분석####
 #train파일로 하면 규칙이 안나온다.. prior파일로 실행했음..
 sample<-order_products__prior[1:20000,]
 sample_join<-sample %>%
@@ -134,9 +196,90 @@ reordered_sample_split<-split(reordered_sample$product_name,reordered_sample$ord
 reordered_sample_transations<-as(reordered_sample_split,"transactions")
 reordered_rule<-apriori(reordered_sample_transations,parameter = list(support=0.001, confidence=0.8, minlen = 3))
 inspect(reordered_rule[1:10])
+######################################
+
+######################################
+##############협업필터링##############
+order_products__prior<-order_products__prior %>%
+  arrange(order_id)
+
+join_df<-order_products__prior %>%
+  left_join(orders,by="order_id")
+
+join_df2<-join_df %>%
+  select(order_id,product_id,reordered,user_id)
+nrow(join_df2)
+
+# join_df3<-join_df2[1:20000,]
+# join_df3<-subset(join_df3,select=c(product_id,reordered,user_id))
+# join_df3<-join_df3 %>%
+#   arrange(user_id,product_id)
+# head(join_df3)
+
+#카운트 기반 협업필터링..
+count_df<-join_df2 %>%
+  group_by(user_id) %>%
+  count(product_id)
+
+count_df2<-count_df %>%
+  filter(n>23)
+"
+1:5,325,258
+2:3,120,658
+3:2,091,509
+4:1,512,047
+5:1,147,284
+6:898,431
+7:720,377
+8;588,304
+9:487,653
+15:190,877
+20:100,537
+23:71,008
+24:63,485
+25:56,835
+30:32,941
+50:3,946
+"
+
+count_mat <- spread(count_df2, product_id, n) %>%
+  remove_rownames() %>%
+  column_to_rownames(var="user_id")
+
+count_rrm <- as(as(count_mat, "matrix"), "realRatingMatrix")
+as(count_rrm,"list")
+rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=2) #given은 count_rrm에서 모든 유저아이디에서 아이템 갯수가 2개이상일 경우에 그것보다 작은수치부터 되는 거 같음
+rating_eval
+#####1
+ubcf_rmse <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
+                         param=list(normalize = "center", method="Cosine"))
+ubcf_pred <- predict(ubcf_rmse, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100) 
+calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
+ubcf_pred <- predict(object = ubcf_rmse, newdata = count_rrm,  n = 5)
+as(ubcf_pred,"list")
+ubcf_pred@items
+recc_matrix <- sapply(ubcf_pred@items, function(x){
+  colnames(count_rrm)[x]
+})
+recc_matrix[,1:4] %>% DT::datatable() #given=2 이상이어야만 실행되는 듯하다 
+
+######2
+trainingData<-sample(977,879)
+trainingSet<-reorder_rrm[trainingData]
+scheme <- evaluationScheme(trainingSet,method="split", train = .8,
+                           given = 2, 
+                           goodRating = 4,
+                           k = 3)
+mUBCF<-Recommender(trainingSet,method="UBCF",parameter="Cosine")
+recommenderUserList<-reorder_rrm[-trainingData]
+UBCFlist<-predict(mUBCF,recommenderUserList,n=5)
+as(UBCFlist,"list")
+################################
+
 
 ################
-###순차분석
+###순차분석#####
 head(sample,10)
 sample<-rename(sample,sequenceID=add_to_cart_order)
 sample<-rename(sample,eventID=order_id)
