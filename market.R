@@ -12,7 +12,6 @@ library(gridExtra)
 library(recommenderlab)
 library(RColorBrewer)
 library(splitstackshape)
-require('gridExtra')
 #install.packages("arules")
 #install.packages("tidyverse")
 #install.packages("arulesViz")
@@ -20,15 +19,16 @@ require('gridExtra')
 #install.packages("splitstackshape")
 #install.packages("arulesSequences")
 #install.packages("recommenderlab")
-install.packages("gridExtra")
+#install.packages("gridExtra")
 aisles<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\aisles.csv")
 departments<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\departments.csv")
 order_products__prior<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__prior.csv")
 order_products__train<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__train.csv")
 orders<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\orders.csv")
-products<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\products.csv")
-sample<-order_products__prior[1:20000,]
+products<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\products.csv",encoding = "UTF-8")
 
+sample<-order_products__prior[1:20000,]
+head(products)
 
 rm(list=ls())
 
@@ -154,7 +154,6 @@ order_products__prior %>%
 sample<-order_products__prior[1:20000,]
 sample_join<-sample %>%
   left_join(products,by="product_id")
-#sample_join  
 sample_join_split<-split(sample_join$product_name, sample_join$order_id)
 sample_join_transactions<-as(sample_join_split,"transactions")
 rules<-apriori(sample_join_transactions, parameter=list(support=0.001, confidence=0.8, minlen = 3))
@@ -204,25 +203,26 @@ order_products__prior<-order_products__prior %>%
   arrange(order_id)
 
 join_df<-order_products__prior %>%
-  left_join(orders,by="order_id")
+  left_join(orders,by="order_id") %>%
+  left_join(products, by="product_id")
 
 join_df2<-join_df %>%
-  select(order_id,product_id,reordered,user_id)
-nrow(join_df2)
+  select(order_id,product_id,reordered,user_id,product_name)
 
-# join_df3<-join_df2[1:20000,]
-# join_df3<-subset(join_df3,select=c(product_id,reordered,user_id))
-# join_df3<-join_df3 %>%
-#   arrange(user_id,product_id)
-# head(join_df3)
-
+head(join_df2)
 #카운트 기반 협업필터링..
 count_df<-join_df2 %>%
   group_by(user_id) %>%
-  count(product_id)
+  count(product_name)
 
 count_df2<-count_df %>%
-  filter(n>23)
+  filter(n>50)
+head(count_df2)
+
+# grep("Speculoos",count_df2$product_name)
+# count_df2[1996,]
+
+######
 "
 1:5,325,258
 2:3,120,658
@@ -241,30 +241,69 @@ count_df2<-count_df %>%
 30:32,941
 50:3,946
 "
+######
 
-count_mat <- spread(count_df2, product_id, n) %>%
+count_mat <- spread(count_df2, product_name, n) %>%
   remove_rownames() %>%
   column_to_rownames(var="user_id")
 
 count_rrm <- as(as(count_mat, "matrix"), "realRatingMatrix")
 as(count_rrm,"list")
-rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=2) #given은 count_rrm에서 모든 유저아이디에서 아이템 갯수가 2개이상일 경우에 그것보다 작은수치부터 되는 거 같음
+rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=1) #given은 count_rrm에서 모든 유저아이디에서 아이템 갯수가 2개이상일 경우에 그것보다 작은수치부터 되는 거 같음
 rating_eval
-#####1
-ubcf_rmse <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
-                         param=list(normalize = "center", method="Cosine"))
-ubcf_pred <- predict(ubcf_rmse, getData(rating_eval, "known"), type="ratings")
-options("scipen" = 100) 
-calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
-ubcf_pred <- predict(object = ubcf_rmse, newdata = count_rrm,  n = 5)
-as(ubcf_pred,"list")
-ubcf_pred@items
-recc_matrix <- sapply(ubcf_pred@items, function(x){
-  colnames(count_rrm)[x]
-})
-recc_matrix[,1:4] %>% DT::datatable() #given=2 이상이어야만 실행되는 듯하다 
 
-######2
+#######################################################
+#####1 UBCF#####
+ubcf_rmse <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
+                         param=list(normalize = "center", method="Cosine")) #method:cosine, pearson 유사도 선정방식
+ubcf_pred <- predict(ubcf_rmse, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100)
+calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
+
+ubcf_pred <- predict(object = ubcf_rmse, newdata = count_rrm,  n = 5)
+ubcf_pred_list<-as(ubcf_pred,"list")
+
+####data table로 보여주는 작업
+df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  if(identical(ubcf_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+    df[i,]<-NA
+  }
+  else{
+    df[i,]<-unlist(ubcf_pred_list[i],use.names = FALSE) #unlist를 이용해서 product_name 각각 하나하나씩 나누기
+  }
+}
+
+user_id<-names(ubcf_pred_list) #리스트 이름 가져오기=user_id 가져오기
+rownames(df)=user_id
+
+df %>%
+  DT::datatable()
+#######################################################
+
+#######################################################
+#####1 IBCF#####
+ibcf_rmse <- Recommender(getData(rating_eval, "train"), method = "IBCF", param=list(k=30)) #k:유사도 값을 계산하는데 고려되는 이웃의 수
+ibcf_pred <- predict(ibcf_rmse, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100)
+calcPredictionAccuracy(ibcf_pred, getData(rating_eval, "unknown"))
+
+ibcf_pred <- predict(object = ibcf_rmse, newdata = count_rrm,  n = 5)
+as(ibcf_pred,"list")
+
+ibcf_pred@items
+#######################################################
+
+#######################################################
+#####1 POPULAR#####
+popular_rmse<-Recommender(getData(rating_eval,"train"), method="POPULAR")
+popular_pred<-predict(popular_rmse,newdata=count_rrm,n=5)
+as(popular_pred,"list")
+#######################################################
+
+#######################################################
+######2######
 trainingData<-sample(977,879)
 trainingSet<-reorder_rrm[trainingData]
 scheme <- evaluationScheme(trainingSet,method="split", train = .8,
@@ -275,8 +314,35 @@ mUBCF<-Recommender(trainingSet,method="UBCF",parameter="Cosine")
 recommenderUserList<-reorder_rrm[-trainingData]
 UBCFlist<-predict(mUBCF,recommenderUserList,n=5)
 as(UBCFlist,"list")
-################################
 
+head(products)
+typeof(products$product_name)
+products$product_name<-as.character(products$product_name)
+#######################################################
+
+#####모형비교#####
+#### 모형평가 설정
+recommender_models <- recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+recommender_models #추천모델가능한 모든 것 #ALS, ALS_implicit, IBCF, POPULAR, RANDOM, RECOMMEND, SVD, SVDF, UBCF
+
+rating_eval_scheme <- evaluationScheme(count_rrm, method="cross-validation",k=3, given=1, goodRating=4)
+
+## 다수 모형 비교 평가
+"
+RANDOM 모형이 예측모형 평가를 위한 기본이 되고 이를 바탕으로 POPULAR, IBCF, UBCF, SVD 추천 모형을 개발하고 나서, 
+“RMSE”, “MSE”, “MAE” 3가지 측도를 바탕으로 가장 오차가 작은 모형을 선택한다.
+"
+rcmm_algorithms <- list(
+  RANDOM = list(name = "RANDOM", param = NULL),
+  POPULAR = list(name = "POPULAR", param = NULL),
+  IBCF = list(name = "IBCF", param = NULL),
+  UBCF = list(name = "UBCF", param = NULL),
+  SVD = list(name = "SVD", param = NULL)
+)
+
+rcmm_eval <- evaluate(rating_eval_scheme, rcmm_algorithms, type="ratings")
+avg(rcmm_eval)
+#######################################################
 
 ################
 ###순차분석#####
@@ -312,7 +378,7 @@ inspect(sample_transactions[60])
 head(sample)
 ################
 
-###################잡
+###################잡##########
 # test<-data.frame(matrix(nrow=131209,ncol=39123))
 # row<-distinct(order_products__train,order_id) #중복값 제거
 # col<-distinct(order_products__train,product_id) #중복값 제거
@@ -323,7 +389,7 @@ head(sample)
 
 
 
-########################## kaggle
+########## kaggle ##########
 # head(mydata)
 # mydata<-mydata[,1:2] #picking up first two rows
 # mydata<-merge(mydata,products,by="product_id") #merging
