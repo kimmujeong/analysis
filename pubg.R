@@ -1,12 +1,13 @@
 library(dplyr)
 library(ggplot2)
 library(xgboost)
+library(corrplot)
 pubg_train<-read.csv("C:\\Users\\thgus\\Downloads\\pubg-finish-placement-prediction\\train_V2.csv")
 pubg_test<-read.csv("C:\\Users\\thgus\\Downloads\\pubg-finish-placement-prediction\\test_V2.csv")
 save(pubg_train,file="./pubg_train.RData")
 
-# head(pubg_train,20)
-# head(pubg_train[order(pubg_train$groupId,decreasing = T),])
+head(pubg_train,20)
+head(pubg_train[order(pubg_train$groupId,decreasing = T),])
 # str(pubg_train)
 # nrow(pubg_train)
 # 
@@ -36,19 +37,45 @@ new_pubg_train<-pubg_train %>%
 nrow(new_pubg_train) #89509
 nrow(pubg_train) #4446966
 
-# #킬포인트 윈포인트 랭크포인트 상관관계 분석
-# cor(pubg_train$killPoints,pubg_train$winPoints) #0.9834167 강한 양의 관계
-# cor(pubg_train$rankPoints,pubg_train$killPoints) #-0.975555 강한 음의 관계
-# cor(pubg_train$rankPoints,pubg_train$winPoints) #-0.9938454 강한 음의 관계
-# 
-# #킬포인트와 윈포인트로 최종결과 관계 보기 위해서
-# head(new_pubg_train[order(new_pubg_train$killPoints,decreasing = TRUE),])
-# head(new_pubg_train[order(new_pubg_train$winPoints,decreasing = TRUE),])
-# 
+#킬포인트 윈포인트 랭크포인트 상관관계 분석
+cor(pubg_train$killPoints,pubg_train$winPoints) #0.9834167 강한 양의 관계
+cor(pubg_train$rankPoints,pubg_train$killPoints) #-0.975555 강한 음의 관계
+cor(pubg_train$rankPoints,pubg_train$winPoints) #-0.9938454 강한 음의 관계
+
+#킬포인트와 윈포인트로 최종결과 관계 보기 위해서
+head(new_pubg_train[order(new_pubg_train$killPoints,decreasing = TRUE),])
+head(new_pubg_train[order(new_pubg_train$winPoints,decreasing = TRUE),])
+
 # #최종결과에 보다 높은 상관관계를 갖는 것은 윈포인트.. 당연한 것
 # cor(new_pubg_train$killPoints, new_pubg_train$winPlacePerc) #0.0898857
 # cor(new_pubg_train$winPoints, new_pubg_train$winPlacePerc) #0.2046172
 
+#rankPoints 분포
+pubg_train %>%
+  count(rankPoints)
+
+#매치타입 분포
+new_pubg_train %>%
+  count(matchType) %>%
+  arrange(desc(n))
+#squad-fpp, duo-fpp, solo-fpp, squad, duo, solo, normal-squad-fpp, normal-solo-fpp, normal-duo-fpp, normal-duo
+
+new_pubg_train %>%
+  filter(matchType=="squad-fpp") %>%
+  summary()
+
+head(new_pubg_train)
+ggplot(new_pubg_train,aes(x=assists, fill=matchType))+geom_bar()
+ggplot(new_pubg_train,aes(x=assists))+geom_bar()+facet_grid(.~matchType)
+
+#종속변수 winPlacePerc와의 상관계수 보기 
+pubg_cordf<-new_pubg_train %>%
+  select(-c(Id, groupId, matchId,matchType))
+pubg_cor<-cor(pubg_cordf)
+corrplot(pubg_cor,method="color")
+cor_df<-setNames(data.frame(pubg_cor["winPlacePerc",]),c("cor"))
+cor_df_order<-cor_df[order(cor_df$cor,decreasing = T), , drop=FALSE]
+view(cor_df_order)
 ############################################################################################
 ############################################################################################
 ############################################################################################

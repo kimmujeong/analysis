@@ -209,7 +209,6 @@ join_df<-order_products__prior %>%
 join_df2<-join_df %>%
   select(order_id,product_id,reordered,user_id,product_name)
 
-head(join_df2)
 #카운트 기반 협업필터링..
 count_df<-join_df2 %>%
   group_by(user_id) %>%
@@ -217,6 +216,7 @@ count_df<-join_df2 %>%
 
 count_df2<-count_df %>%
   filter(n>50)
+
 head(count_df2)
 
 # grep("Speculoos",count_df2$product_name)
@@ -248,8 +248,9 @@ count_mat <- spread(count_df2, product_name, n) %>%
   column_to_rownames(var="user_id")
 
 count_rrm <- as(as(count_mat, "matrix"), "realRatingMatrix")
-as(count_rrm,"list")
 rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=1) #given은 count_rrm에서 모든 유저아이디에서 아이템 갯수가 2개이상일 경우에 그것보다 작은수치부터 되는 거 같음
+
+as(count_rrm,"list")
 rating_eval
 
 #######################################################
@@ -290,16 +291,56 @@ options("scipen" = 100)
 calcPredictionAccuracy(ibcf_pred, getData(rating_eval, "unknown"))
 
 ibcf_pred <- predict(object = ibcf_rmse, newdata = count_rrm,  n = 5)
-as(ibcf_pred,"list")
+ibcf_pred_list<-as(ibcf_pred,"list")
+####data table로 보여주는 작업.. 이것이 최종본 
+##에러.. 5개추천하는데 1게,2개,4개 추천하는 것이 있네.. ibcf_pred_list[80]에 3개만 들어있음
 
-ibcf_pred@items
+user_id<-names(ibcf_pred_list) #리스트 이름 가져오기=user_id 가져오기
+ibcf_df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  for(j in 1:5){
+    if(identical(ibcf_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+      ibcf_df[i,]<-NA
+    } 
+    else{
+      ibcf_df[i,j]<-unlist(ibcf_pred_list[i],use.names = FALSE)[j]
+    }
+  }
+}
+
+rownames(ibcf_df)=user_id
+
+ibcf_df %>%
+  DT::datatable()
+
+#ibcf_pred@items
 #######################################################
 
 #######################################################
 #####1 POPULAR#####
 popular_rmse<-Recommender(getData(rating_eval,"train"), method="POPULAR")
 popular_pred<-predict(popular_rmse,newdata=count_rrm,n=5)
-as(popular_pred,"list")
+popular_pred_list<-as(popular_pred,"list")
+
+user_id<-names(popular_pred_list) #리스트 이름 가져오기=user_id 가져오기
+popular_df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  for(j in 1:5){
+    if(identical(popular_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+      popular_df[i,]<-NA
+    } 
+    else{
+      popular_df[i,j]<-unlist(popular_pred_list[i],use.names = FALSE)[j]
+    }
+  }
+}
+
+rownames(popular_df)=user_id
+
+popular_df %>%
+  DT::datatable()
 #######################################################
 
 #######################################################
@@ -321,7 +362,7 @@ products$product_name<-as.character(products$product_name)
 #######################################################
 
 #####모형비교#####
-#### 모형평가 설정
+#### 모형평가 설정####
 recommender_models <- recommenderRegistry$get_entries(dataType = "realRatingMatrix")
 recommender_models #추천모델가능한 모든 것 #ALS, ALS_implicit, IBCF, POPULAR, RANDOM, RECOMMEND, SVD, SVDF, UBCF
 
