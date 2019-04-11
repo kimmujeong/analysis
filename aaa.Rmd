@@ -1,0 +1,100 @@
+---
+title: "Untitled"
+author: "kmj"
+date: "2019<eb>뀈 4<ec>썡 4<ec>씪"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library}
+library(dplyr)
+library(ggplot2)
+library(arules) #연관분석
+library(arulesSequences)
+library(Matrix)
+library(arulesViz)
+library(tidyr)
+library(tibble) #remove_rownames
+library(gridExtra)
+library(recommenderlab)
+
+aisles<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\aisles.csv")
+departments<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\departments.csv")
+order_products__prior<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__prior.csv")
+order_products__train<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\order_products__train.csv")
+orders<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\orders.csv")
+products<-read.csv("C:\\Users\\thgus\\Downloads\\instacart-market-basket-analysis\\products.csv",encoding = "UTF-8")
+
+order_products__prior<-order_products__prior %>%
+  arrange(order_id)
+
+join_df<-order_products__prior %>%
+  left_join(orders,by="order_id") %>%
+  left_join(products, by="product_id")
+
+join_df2<-join_df %>%
+  select(order_id,product_id,reordered,user_id,product_name)
+
+count_df<-join_df2 %>%
+  group_by(user_id) %>%
+  count(product_name)
+
+count_df2<-count_df %>%
+  filter(n>50)
+
+count_mat <- spread(count_df2, product_name, n) %>%
+  remove_rownames() %>%
+  column_to_rownames(var="user_id")
+
+count_rrm <- as(as(count_mat, "matrix"), "realRatingMatrix")
+rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=1) #given은 count_rrm에서 모든 유저아이디에서 아이템 갯수가 2개이상일 경우에 그것보다 작은수치부터 되는 거 같음
+
+ubcf_rmse <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
+                         param=list(normalize = "center", method="Cosine")) #method:cosine, pearson 유사도 선정방식
+ubcf_pred <- predict(ubcf_rmse, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100)
+calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
+
+ubcf_pred <- predict(object = ubcf_rmse, newdata = count_rrm,  n = 5)
+ubcf_pred_list<-as(ubcf_pred,"list")
+
+####data table로 보여주는 작업
+df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  if(identical(ubcf_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+    df[i,]<-NA
+  }
+  else{
+    df[i,]<-unlist(ubcf_pred_list[i],use.names = FALSE) #unlist를 이용해서 product_name 각각 하나하나씩 나누기
+  }
+}
+
+user_id<-names(ubcf_pred_list) #리스트 이름 가져오기=user_id 가져오기
+rownames(df)=user_id
+```
+
+
+## R Markdown
+
+```{r echo=FALSE}
+
+df %>%
+  DT::datatable()
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

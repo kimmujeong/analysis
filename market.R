@@ -9,7 +9,7 @@ library(arulesViz)
 library(tidyr)
 library(tibble) #remove_rownames
 library(gridExtra)
-library(recommenderlab)
+library(recommenderlab) #realRatingMatrix
 library(RColorBrewer)
 library(splitstackshape)
 #install.packages("arules")
@@ -242,7 +242,8 @@ head(count_df2)
 50:3,946
 "
 ######
-
+count_df2
+spread(count_df2,product_name,n)
 count_mat <- spread(count_df2, product_name, n) %>%
   remove_rownames() %>%
   column_to_rownames(var="user_id")
@@ -290,7 +291,7 @@ ibcf_pred <- predict(ibcf_rmse, getData(rating_eval, "known"), type="ratings")
 options("scipen" = 100)
 calcPredictionAccuracy(ibcf_pred, getData(rating_eval, "unknown"))
 
-ibcf_pred <- predict(object = ibcf_rmse, newdata = count_rrm,  n = 5)
+ibcf_pred <- predict(object = ibcf_rmse, newdata = count_rrm,  n = 5) #type="topNList" 속성도 있는듯.. https://www.kaggle.com/hendraherviawan/itembased-collaborative-filter-recommendation-r
 ibcf_pred_list<-as(ibcf_pred,"list")
 ####data table로 보여주는 작업.. 이것이 최종본 
 ##에러.. 5개추천하는데 1게,2개,4개 추천하는 것이 있네.. ibcf_pred_list[80]에 3개만 들어있음

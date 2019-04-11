@@ -4,7 +4,7 @@ library(mlr)
 bike_train<-read.csv("C:\\Users\\thgus\\Downloads\\bike-sharing-demand\\train.csv",encoding="UTf-8")
 bike_test<-read.csv("C:\\Users\\thgus\\Downloads\\bike-sharing-demand\\test.csv",encoding="UTf-8")
 head(bike_train)
-
+#샘플작업 bike_train_sample<-bike_train[sample(1:nrow(bike_train),1000),]
 bike_train$year<-substr(bike_train$datetime,1,4) #그냥 바로 컬럼추가됨
 bike_train$month<-substr(bike_train$datetime,6,7)
 bike_train$day<-substr(bike_train$datetime,9,10)
