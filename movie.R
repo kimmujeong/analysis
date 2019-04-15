@@ -6,8 +6,9 @@ library(reshape2)
 library(data.table)
 rating<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\ratings.csv") #500100
 movies<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\movies.csv",header = TRUE)
-users<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\users.dat",header=FALSE)
+#users<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\users.dat",header=FALSE)
 #tags 데이터 활용해서 tf-idf로 추천가능해보임
+#추천모델가능한 모든 것 #ALS, ALS_implicit, IBCF, POPULAR, RANDOM, RECOMMEND, SVD, SVDF, UBCF
 head(rating,20)
 head(movies)
 # which(movies$title=="[REC]쨀 3 G챕nesis (2012)") 오류값 찾기
@@ -51,16 +52,17 @@ genre_matrix2
 
 movie<-rating %>%
   left_join(movies,by="movieId") %>%
-  select(userId,rating,title,movieId)
+  select(userId,rating,title)
 
 movie_sample<-movie[sample(1:nrow(movie),5000),] #용량문제때문에 샘플링
 movie_sample<-movie_sample %>%
   arrange(userId)
-head(movie_sample)
+head(movie_sample,20)
 
 movie_mat<-spread(movie_sample,title,rating) %>%
   remove_rownames() %>%
   column_to_rownames(var="userId")
+# list형태임 movie_mat[[1]] 이런 식으로 확인 가능 
 # movie_mat <- dcast(movie_sample, userId~title, value.var = "rating", na.rm=FALSE) 위와 동일한 작업 
 
 movie_rrm <- as(as(movie_mat, "matrix"), "realRatingMatrix")
