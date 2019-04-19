@@ -1,6 +1,6 @@
 library(XML)
 library(data.table)
-library(stringr)
+library(stringr) #str_extract_all
 library(dplyr)
 api_url<-"http://apis.data.go.kr/B552061/frequentzoneLg/getRestFrequentzoneLg"
 servicekey<-"oxrnAfkJN4PXQnHw7cNJANXNzXxIz6B6ebL8oWffyvb9nb5mqpQX4ANZBzFnUmhG2XhKl9PQ8TDQ7u5xY974WQ%3D%3D"
@@ -14,6 +14,8 @@ servicekey<-"oxrnAfkJN4PXQnHw7cNJANXNzXxIz6B6ebL8oWffyvb9nb5mqpQX4ANZBzFnUmhG2Xh
 서초구:650
 서대문구:410
 '
+#########################################################
+###################단위테스트##########################
 url<-paste0(api_url,"?","serviceKey=",servicekey,"&searchYearCd=",2017,"&siDo=",11,"&guGun=",305,"&type=","xml","&numOfRows=",10,"&pageNo=",1)
 raw.data <- xmlTreeParse(url, useInternalNodes = TRUE, encoding = "utf-8")
 rootNode <- xmlRoot(raw.data)
@@ -42,7 +44,7 @@ location_200
 location_200<-lapply(location_200,as.double) #문자형태를 숫자형태로 변환 
 location_200<-data.frame(location_200$V1,location_200$V2) #다시 데이터 프레임 형태로 , v인지 x인지 확인해야 함 
 location_200<-setNames(data.frame(location_200),c("lon","lat")) #dplyr 이용해서 rename(,"lon"=V1,"lat"=V2)가능
-
+#########################################################
 
 ###############################################################################
 ###########################for문 처리 완료#####################################
@@ -145,4 +147,55 @@ ma_geumcheon_loc<-many_accident_function("geumcheon")
 ma_seocho_loc<-many_accident_function("seocho")
 ma_seodaemun_loc<-many_accident_function("seodaemun")
 
+
+
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########자전거 사고 다발지역
+bike_file<-read.csv("C:\\Users\\thgus\\NaverCloud\\Downloads\\교통사고 스팟\\도로교통공단_전국_자전거사고다발지(2017년).csv")
+'
+강북구:11305
+종로구:11110
+관악구:11620
+은평구:11380
+강동구:11740
+금천구:11545
+서초구:11650
+서대문구:11410
+'
+grep('^11305', bike_file$법정동코드)
+bike_file[grep('^11305', bike_file$법정동코드),]
+
+bike_file %>%
+  filter(grepl('^11305',법정동코드)) #grep, grepl 차이... 
+'grep을 썼을때는 행번호를 출력하고 grepl은 논리값(true, false)을 출력한다
+필터에서는 논리값을 필요로하므로 grepl을 써야함!!!'
+
+bike_gangbuk<-bike_file %>% 
+  filter(str_detect(법정동코드, "^11305"))
+
+polygon<-bike_gangbuk$다발지역폴리곤[1]
+str<-as.character(polygon) #문자열로 타입 변환
+str<-substr(str,33+2,nchar(str)-2) #쓸데없는 표현정리
+str_list<-str_extract_all(str,'(?<=\\[)[0-9]+[.?0-9]+,[0-9]+[.0-9]+')
+str_list[[1]]
+length(str_list[[1]]) #데이터갯수확인 
+row_length=length(str_list[[1]]) #데이터 갯수를 로우숫자로 지정 
+
+bike_location<-data.frame(matrix(nrow=row_length, ncol=2))
+
+for (i in 1:row_length){
+  for (j in 1:2){
+    tmp<-str_split(str_list[[1]][i],',')
+    bike_location[i,j]<-tmp[[1]][j]
+  }
+}
+
+bike_location<-lapply(bike_location,as.double) #문자형태를 숫자형태로 변환 
+bike_location<-data.frame(bike_location$X1,bike_location$X2) #다시 데이터 프레임 형태로 , v인지 x인지 확인해야 함 
+bike_location<-setNames(data.frame(bike_location),c("lon","lat")) #dplyr 이용해서 rename(,"lon"=V1,"lat"=V2)가능
+bike_location
 

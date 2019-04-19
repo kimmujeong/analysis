@@ -103,9 +103,10 @@ get_googlemap("seoul", maptype="roadmap", zoom=11) %>%
 #강북구
 get_googlemap("gangbukgu", maptype="roadmap", zoom=13) %>%
   ggmap+geom_point(data=gangbuk, aes(x=lon,y=lat))+
-  geom_point(data=ma_gangbuk_loc[[1]],aes(x=lon, y = lat), color='red')+
+  geom_point(data=ma_gangbuk_loc[[1]],aes(x=lon, y = lat), color='red')+ #사고다발지역
   geom_point(data=ma_gangbuk_loc[[2]],aes(x=lon, y = lat), color='red')+
-  geom_point(data=ma_gangbuk_loc[[3]],aes(x=lon, y = lat), color='red')
+  geom_point(data=ma_gangbuk_loc[[3]],aes(x=lon, y = lat), color='red')+
+  geom_point(data=bike_location,aes(x=lon, y = lat), color='orange') # 자전거
 
 #종로구
 get_googlemap("jongnogu", maptype="roadmap", zoom=13) %>%
