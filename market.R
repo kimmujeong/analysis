@@ -256,13 +256,13 @@ rating_eval
 
 #######################################################
 #####1 UBCF#####
-ubcf_rmse <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
+ubcf_model <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
                          param=list(normalize = "center", method="Cosine")) #method:cosine, pearson 유사도 선정방식
-ubcf_pred <- predict(ubcf_rmse, getData(rating_eval, "known"), type="ratings")
+ubcf_pred <- predict(ubcf_model, getData(rating_eval, "known"), type="ratings")
 options("scipen" = 100)
 calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
 
-ubcf_pred <- predict(object = ubcf_rmse, newdata = count_rrm,  n = 5)
+ubcf_pred <- predict(object = ubcf_model, newdata = count_rrm,  n = 5)
 ubcf_pred_list<-as(ubcf_pred,"list")
 
 ####data table로 보여주는 작업
@@ -286,12 +286,12 @@ df %>%
 
 #######################################################
 #####1 IBCF#####
-ibcf_rmse <- Recommender(getData(rating_eval, "train"), method = "IBCF", param=list(k=30)) #k:유사도 값을 계산하는데 고려되는 이웃의 수
-ibcf_pred <- predict(ibcf_rmse, getData(rating_eval, "known"), type="ratings")
+ibcf_model <- Recommender(getData(rating_eval, "train"), method = "IBCF", param=list(k=30)) #k:유사도 값을 계산하는데 고려되는 이웃의 수
+ibcf_pred <- predict(ibcf_model, getData(rating_eval, "known"), type="ratings")
 options("scipen" = 100)
 calcPredictionAccuracy(ibcf_pred, getData(rating_eval, "unknown"))
 
-ibcf_pred <- predict(object = ibcf_rmse, newdata = count_rrm,  n = 5) #type="topNList" 속성도 있는듯.. https://www.kaggle.com/hendraherviawan/itembased-collaborative-filter-recommendation-r
+ibcf_pred <- predict(object = ibcf_model, newdata = count_rrm,  n = 5) #type="topNList" 속성도 있는듯.. https://www.kaggle.com/hendraherviawan/itembased-collaborative-filter-recommendation-r
 ibcf_pred_list<-as(ibcf_pred,"list")
 ####data table로 보여주는 작업.. 이것이 최종본 
 ##에러.. 5개추천하는데 1게,2개,4개 추천하는 것이 있네.. ibcf_pred_list[80]에 3개만 들어있음
@@ -320,8 +320,8 @@ ibcf_df %>%
 
 #######################################################
 #####1 POPULAR#####
-popular_rmse<-Recommender(getData(rating_eval,"train"), method="POPULAR")
-popular_pred<-predict(popular_rmse,newdata=count_rrm,n=5)
+popular_model<-Recommender(getData(rating_eval,"train"), method="POPULAR")
+popular_pred<-predict(popular_model,newdata=count_rrm,n=5)
 popular_pred_list<-as(popular_pred,"list")
 
 user_id<-names(popular_pred_list) #리스트 이름 가져오기=user_id 가져오기

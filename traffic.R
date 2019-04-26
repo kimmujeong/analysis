@@ -65,7 +65,7 @@ seodaemun<-rename(seodaemun,lon="경도",lat="위도")
 
 #######시각화#########
 #지역구 zoom13 / 서울전지역 zoom11
-###전체표시 
+##########전체표시##############
 get_googlemap("seoul", maptype="roadmap", zoom=11) %>%
   ggmap+geom_point(data=gangbuk, aes(x=lon,y=lat))+
   geom_point(data=jongno,aes(x=lon,y=lat),color='blue')+
@@ -99,6 +99,7 @@ get_googlemap("seoul", maptype="roadmap", zoom=11) %>%
   geom_point(data=ma_seodaemun_loc[[1]],aes(x=lon, y = lat), color='red')+
   geom_point(data=ma_seodaemun_loc[[2]],aes(x=lon, y = lat), color='red')+
   geom_point(data=ma_seodaemun_loc[[3]],aes(x=lon, y = lat), color='red')
+############################
 
 #강북구
 get_googlemap("gangbukgu", maptype="roadmap", zoom=13) %>%
