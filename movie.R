@@ -69,6 +69,10 @@ movie_mat<-spread(movie,title,rating) %>%
 # movie_mat <- dcast(movie_sample, userId~title, value.var = "rating", na.rm=FALSE) 위와 동일한 작업 
 
 movie_rrm <- as(as(movie_mat, "matrix"), "realRatingMatrix") #610x9719 610명의 사용자, 9719개의 영화 
+
+#영화를 165편 이상 평가한 사용자, 적어도 10회 이상 시청된 영화로 데이터처리
+movie_rrm<-movie_rrm[rowCounts(movie_rrm)>=165, colCounts(movie_rrm)>=10] #159x2269 159명의 사용자, 2269개의 영화
+
 # as(movie_rrm,"list")
 # as(movie_rrm[1:5],"list")
 
@@ -121,9 +125,6 @@ row.names(df_view_per_user)<-NULL
 head(df_view_per_user)
 df_view_per_user %>% #사용자별 평균 관람횟수.. 약 165회
   summarise(mean(view))
-  
-#영화를 165편 이상 평가한 사용자, 적어도 10회 이상 시청된 영화로 데이터처리
-movie_rrm<-movie_rrm[rowCounts(movie_rrm)>=165, colCounts(movie_rrm)>=10] #159x2269 159명의 사용자, 2269개의 영화
 
 
 rating_eval <- evaluationScheme(movie_rrm, method="split", train=0.7, given=1)
@@ -237,6 +238,69 @@ row.names(ubcf_sort_df)<-NULL
 #############################################모델평가#########################################
 ##############################################################################################
 
+rowCounts(movie_rrm)
+rowcount_df<-data.frame(rowCounts(movie_rrm))
+rowcount_df %>% #최소값 119
+  arrange(rowCounts.movie_rrm.)
+
+###############################방법1#######################################
+eval_sets<-evaluationScheme(data=movie_rrm, method="cross-validation", given=100, goodRating=3, k=4)
+
+#평가할 모델 정의 
+model_to_evaluate<-"IBCF"
+model_parameters<-NULL
+
+#모델 생성
+eval_recommender<-Recommender(data=getData(eval_sets,"train"), method=model_to_evaluate,parameter=model_parameters)성
+
+item_to_recommend<-6 #추천할 아이템 수 
+eval_predict<-predict(eval_recommender, newdata=getData(eval_sets,"known"),n=item_to_recommend,type="ratings") #예측된 평점의 매트릭스 
+
+calcPredictionAccuracy(x=eval_predict, data=getData(eval_sets,"unknown"),byUser=TRUE) #각 사용자별 모델평가
+calcPredictionAccuracy(x=eval_predict, data=getData(eval_sets,"unknown"),byUser=FALSE) #전체 모델 평가
 
 
+###############################방법2#######################################
+result<-evaluate(x=eval_sets, method=model_to_evaluate, n=seq(10,100,10)) #n:사용자별로 추천할 아이템 수 seq(10,100,10):10부터 100까지 10씩 증가됨
+getConfusionMatrix(result)[[1]] #kfold갯수만큼 가능
+plot(result,annotate=TRUE,main="ROC curve")
+plot(result,"prec/rec",annotate=TRUE,main="Precision-recall")
 
+
+##############################################################################################
+#######################################가장 적합한 모델 식별##################################
+##############################################################################################
+models_to_evaluate<-list(
+  IBCF_cos=list(name="IBCF",param=list(method="cosine")),
+  IBCF_cor=list(name="IBCF",param=list(method="pearson")),
+  UBCF_cos=list(name="UBCF",param=list(method="cosine")),
+  UBCF_cor=list(name="UBCF",param=list(method="pearson")),
+  random=list(name="RANDOM",param=NULL)
+)
+n_recommend<-c(1,5,seq(10,100,10))
+list_result<-evaluate(eval_sets,method=models_to_evaluate,n=n_recommend)
+getConfusionMatrix(list_result[[1]])[[1]] #IBCF_cos getConfusionMatrix(list_result[[1]])[[1~4]]
+getConfusionMatrix(list_result[[2]])[[1]] #IBCF_cor
+getConfusionMatrix(list_result[[3]])[[1]] #UBCF_cos
+getConfusionMatrix(list_result[[4]])[[1]] #UBCF_cor
+getConfusionMatrix(list_result[[5]])[[1]] #random
+
+avg_matrix<-lapply(list_result,avg) #평균 혼동 매트릭스 생성, [[1~4]] 까지의 평균 
+avg_matrix$IBCF_cos
+
+plot(list_result,annotate=1,legend="topleft") #legend:레이블 위치 
+title("ROC curve")
+
+plot(list_result,"prec/rec",annotate=1)
+title("Precision-recall")
+
+##############################################################################################
+##########################################매개변수 최적화#####################################
+##############################################################################################
+vector_k<-c(5,10,20,30,40)
+ibcf_k_evaluate<-lapply(vector_k,function(k){
+  list(name="IBCF",param=list(method="cosine",k=k))
+})
+names(ibcf_k_evaluate)<-paste0("IBCF_k_",vector_k)
+list_result<-evaluate(eval_sets,method=ibcf_k_evaluate,n=n_recommend)
+plot(list_result,annotate=1,legned="topleft")

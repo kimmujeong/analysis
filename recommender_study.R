@@ -42,3 +42,7 @@ recc_matrix_book[,1:4]
 table(recc_matrix_book)
 typeof(recc_matrix_book)
 class(recc_matrix_book)
+rowCounts(rating_movies)
+df<-data.frame(rowCounts(rating_movies))
+df %>%
+  arrange(rowCounts.rating_movies.)
