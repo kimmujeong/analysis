@@ -60,8 +60,13 @@ movie<-rating %>%
 #   arrange(userId)
 # head(movie_sample,20)
 
-movie<-movie[-c(17820,80597,4748,11452),] #중복값제거 
-
+movie<-movie[-c(17820,80597,4748,11452),] #중복값제거
+'
+* 17450, 17820
+* 80406, 80597
+* 4591, 4748
+* 11242, 11452
+'
 movie_mat<-spread(movie,title,rating) %>%
   remove_rownames() %>%
   column_to_rownames(var="userId")
