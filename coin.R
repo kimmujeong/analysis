@@ -6,7 +6,7 @@ library(dplyr)
 library(ggplot2)
 library(proxy) #유사도 측정 라이브러리 
 library(lsa) #코사인.. 코사인 거리 구하기 위해서 
-library(highcharter) #고성능 그래프 
+library(highcharter) # 그래프 
 library(dygraphs)
 library(xts)
 ubci_index_options()
@@ -68,6 +68,9 @@ getSymbols("^GSPC") #s&p 500 지수 가져오기 class : "xts" "zoo"
 
 #############단일종목일 경우 dygraph, highcharter를 이용해서 동적으로 가능######
 #dygrpah
+dygraph(GSPC) %>%
+  dyRangeSelector()
+
 dygraph(GSPC$GSPC.Close) %>%
   dyRangeSelector()
 
