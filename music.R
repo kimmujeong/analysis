@@ -1,18 +1,19 @@
 library(spotifyr)
 library(dplyr)
 library(stringr)
+library(ggplot2)
 Sys.setenv(SPOTIFY_CLIENT_ID = 'f563448409d34e63ba3ed22cf6c710b0')
 Sys.setenv(SPOTIFY_CLIENT_SECRET = '17b11a571b4c4be9baa1a805bb1bb0c5')
 access_token <- get_spotify_access_token()
 
 #함수정리
-#get_track_audio_features(곡 id) : 곡 id를 기준으로 곡 특성가져옴, 최대 100개까지 가져올수있ㅇ
+#get_track_audio_features(곡 id) : 곡 id를 기준으로 곡 특성가져옴, 최대 100개까지 가져올수있음
 #get_artist_audio_features(아티스트) : 아티스트 정규앨범만 가져옴. 곡에 대한 피쳐도 가져오는데 정규앨범만 가져오는게 문제
 #get_artist_albums(앨범 id) : 앨범 정보 가져오기
 
 #아티스트코드
-넬:5WY88tCMFA6J6vqSN3MmDZ
-bts:3Nrfpe0tUJi4K4DXYWgMUX
+#넬:5WY88tCMFA6J6vqSN3MmDZ
+#bts:3Nrfpe0tUJi4K4DXYWgMUX
 
 #get_artist_audio_fratures : 정규앨범만 가져옴..
 bts <- get_artist_audio_features('bts')
@@ -111,13 +112,19 @@ get_music_feature<-function(artistid){
 nell_feature<-get_music_feature("5WY88tCMFA6J6vqSN3MmDZ")
 bts_feature<-get_music_feature("3Nrfpe0tUJi4K4DXYWgMUX")
 vibe_feature<-get_music_feature("68ym0sOo7MazZxScbm1wtI")
-nell_feature %>%
+nell_mean<-nell_feature %>%
   select(-(id)) %>%
   summarise_all(funs(mean))
-bts_feature %>%
+bts_mean<-bts_feature %>%
   select(-id) %>%
   summarise_all(funs(mean))
-vibe_feature %>%
+vibe_mean<-vibe_feature %>%
   select(-id) %>%
   summarise_all(funs(mean))
-  
+
+ggplot(data=nell_mean,aes(x=energy))+geom
+plot(nell_mean)
+as.data.frame(nell_mean)
+data<-nell_mean %>%
+  select(danceability, energy, key)
+data
