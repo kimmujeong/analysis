@@ -24,12 +24,15 @@ head(test)
 train2<-train[1:100000,] #adaboost 십만개부터 시간 조금 걸림 
 
 fit<-adaboost(target~.-id-target, data=train, nIter = 2)
-predict_result<-predict(fit, newdata = test)
+test$target<-predict(fit, newdata = test)
 
-test$target<-predict_result$class
-
-test$id
+print(fit)
+get_tree(fit$trees)
 write.csv(test[,c("id","target")], file="save3.csv", row.names = FALSE)
 
-save<-read.csv("save.csv")
-head(save,100)
+
+#############adabag 라이브러리
+install.packages("adabag")
+library(adabag)
+train$target<-as.factor(train$target)
+adabag_fit<-boosting(target~.-id-target,data=train,mfinal = 3)
