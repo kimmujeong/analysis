@@ -1,0 +1,28 @@
+---
+title: "test"
+author: "kmj"
+date: "2019년 9월 3일"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 라이브러리, 데이터 설정
+
+여기에는 소주제
+```{r, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr) #gather
+soccer<-read.csv("CompleteDataset.csv")
+head_sc<-head(soccer)
+```
+
+## 데이터 코드
+```{r}
+#오버롤 보여주기, 데이터값 표시
+ggplot(head_sc, aes(x=Name, y=Overall, fill=Name, label=Overall))+geom_bar(stat = "identity")+
+  scale_y_continuous(breaks=c(25,50,75,90))+geom_text()
+```
