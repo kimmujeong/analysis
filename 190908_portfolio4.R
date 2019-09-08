@@ -1,0 +1,189 @@
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(spotifyr)
+library(tidyr) #gather
+library(proxy) #코사인거리 구하기
+
+Sys.setenv(SPOTIFY_CLIENT_ID = 'f563448409d34e63ba3ed22cf6c710b0')
+Sys.setenv(SPOTIFY_CLIENT_SECRET = '17b11a571b4c4be9baa1a805bb1bb0c5')
+access_token <- get_spotify_access_token()
+
+#함수생성
+get_music_feature<-function(artistid){
+  album<-get_artist_albums(artistid) #앨범 가져오기
+  album_ids<-album$id #앨범id 값 가져오기
+  
+  #앨범별로 구분해서 넣기
+  list<-list()
+  k=1
+  for (i in album_ids){
+    list[[k]]<-get_album_tracks(i) %>%
+      select(id,name)
+    k=k+1
+  }
+  
+  #전체를 하나의 변수로 합치기, songid만 
+  all_song_id<-append(list[[1]]$id,list[[2]]$id)
+  for(i in 3:length(list)){
+    all_song_id<-append(all_song_id,list[[i]]$id)
+  }
+  
+  if(length(all_song_id)%%100==0) #곡 수가 100 단위면 딱 떨어짐
+    number<-length(all_song_id)%/%100
+  else                            #곡 수가 100단위가 아니면 몫+1해줘야함
+    number<-(length(all_song_id)%/%100)+1
+  
+  tmp<-list()
+  if(number==1) #전체 곡 수가 100곡이 안되는 경우
+    tmp[[1]]<-all_song_id[1:length(all_song_id)]
+  
+  else{ #전체 곡 수가 100곡이 넘는 경우 
+    for(j in 1:(number-1)){
+      tmp[[j]]<-all_song_id[(1+100*(j-1)):(100*j)]
+    }
+    tmp[[number]]<-all_song_id[(1+100*(number-1)):length(all_song_id)]
+  }
+  
+  result<-data.frame()
+  for(k in 1:number){
+    result<-rbind(result,get_track_audio_features(tmp[[k]])) #rbind도 가능하고 bind_rows도 가능 
+  }
+  
+  result<-result %>%
+    select(-c(type,uri,track_href,analysis_url))
+  
+  return(result)
+}
+
+#feature 평균 함수 생성
+feature_mean<-function(artist_feature){
+  artist_feature %>%
+    select(-c(id,loudness,tempo,duration_ms,time_signature,key)) %>%
+    summarise_all(funs(mean))
+}
+
+nell_feature<-get_music_feature("5WY88tCMFA6J6vqSN3MmDZ")
+bts_feature<-get_music_feature("3Nrfpe0tUJi4K4DXYWgMUX")
+vibe_feature<-get_music_feature("68ym0sOo7MazZxScbm1wtI")
+vibe_feature2<-get_music_feature("1pjLQCQ1ck57Ml3lcoZ2Xi")
+red_feature<-get_music_feature("1z4g3DjTBBZKhvAroFlhOM")
+black_feature<-get_music_feature("41MozSoPIsD1dJM0CLPjZF")
+exo_feature<-get_music_feature("3cjEqqelV9zb4BYE3qDQ4O")
+bhs_feature<-get_music_feature("57htMBtzpppc1yoXgjbslj")
+mc_feature<-get_music_feature("3MaRWfwKpbYnkYHC5gRKYo")
+jan_feature<-get_music_feature("2SY6OktZyMLdOnscX3DCyS")
+
+#오류데이터 제거
+nell_feature<-nell_feature[1:(nrow(nell_feature)-12),]
+vibe_feature<-rbind(vibe_feature,vibe_feature2)
+bhs_feature<-bhs_feature[1:119,]
+mc_feature<-mc_feature[1:227,]
+jan_feature<-jan_feature[1:48,]
+
+nell_mean<-feature_mean(nell_feature)
+bts_mean<-feature_mean(bts_feature)
+vibe_mean<-feature_mean(vibe_feature)
+red_mean<-feature_mean(red_feature)
+black_mean<-feature_mean(black_feature)
+exo_mean<-feature_mean(exo_feature)
+bhs_mean<-feature_mean(bhs_feature)
+mc_mean<-feature_mean(mc_feature)
+jan_mean<-feature_mean(jan_feature)
+
+#EDA
+#gather
+gather_nell_feature<-gather(nell_mean,feature, value)
+gather_bts_feature<-gather(bts_mean,feature,value)
+gather_vibe_feature<-gather(vibe_mean,feature,value)
+gather_red_feature<-gather(red_mean,feature,value)
+gather_black_feature<-gather(black_mean,feature,value)
+gather_exo_feature<-gather(exo_mean,feature,value)
+gather_bhs_feature<-gather(bhs_mean,feature,value)
+gather_mc_feature<-gather(mc_mean,feature,value)
+gather_jan_feature<-gather(jan_mean,feature,value)
+
+#가수별 특성비교 시각화
+merge_data2<-rbind(gather_nell_feature,gather_bts_feature,gather_vibe_feature,gather_red_feature,gather_black_feature,
+                   gather_exo_feature, gather_bhs_feature,gather_mc_feature,gather_jan_feature)
+merge_data2$data<-c(rep("nell", nrow(gather_nell_feature)), rep("bts",nrow(gather_bts_feature)), rep("vibe", nrow(gather_vibe_feature)), 
+                    rep("redverbet",nrow(gather_red_feature)), rep("blackpink", nrow(gather_black_feature)), rep("exo" ,nrow(gather_exo_feature)), 
+                    rep("박효신", nrow(gather_bhs_feature)), rep("mcthemax", nrow(gather_mc_feature)), rep("잔나비", nrow(gather_jan_feature)))
+ggplot(merge_data2,aes(x=feature, y=value, fill=data))+geom_col(position = "dodge")
+
+###########1. 클러스터링
+###계층적 군집분석
+#클러스터링에 맞는 데이터프레임으로 고치기
+cluster_df<-as.data.frame(rbind(nell_mean,bts_mean,vibe_mean,red_mean,black_mean,exo_mean,bhs_mean,mc_mean,jan_mean))
+rownames(cluster_df)<-c("nell","bts","vibe","redvelvet","blackpink","exo","박효신","mc the max","잔나비")
+
+d<-dist(cluster_df) #거리계산
+
+fit.average<-hclust(d, method = "average")
+plot(fit.average, hang=-1, cex=.8, main="Average Linkage Clustering")
+
+#최종 군집 방안 구하기
+clusters<-cutree(fit.average,k=3) #클러스터 갯수:k 
+table(clusters)
+aggregate(cluster_df, by=list(cluster=clusters), median)
+plot(fit.average, hang=-1, cex=.8)
+rect.hclust(fit.average,k=3) #네모박스로 구별해줌 
+
+###########2. 곡 유사도 분석
+#song1 우린너무멀리있다 https://open.spotify.com/track/48cc6ddojyx8EPlDrIeHlp
+#song2 나만 안되는 연애 https://open.spotify.com/track/2uaC8QIz0OocPl8bFcNFt0
+#song3 기다린 만큼 더 https://open.spotify.com/track/03YtYSkpHqqY3EBmHJkTjP
+#song4 영원+1 https://open.spotify.com/track/0cI7LmBgwXN4Sv7W2zWsD3
+#song5 착각 https://open.spotify.com/track/7c8cPVLWvtZwxDxA3KkWFP
+#song6 신청곡 https://open.spotify.com/track/57jBcQUCJaIUTRbqBmW7D1
+#song7 하루 https://open.spotify.com/track/3jEEkgLOxZLg2mcteCLTwA
+#song8 눈의 꽃 https://open.spotify.com/track/2fRFwWwZG7Qfkui7GcxTMy
+#song9 not going anywhere https://open.spotify.com/track/1lv17MSSDr1iBS2vp6UoRt
+#song10 미워하자 https://open.spotify.com/track/6udwOVrx63wvimCGhc89fU
+#song11 오래된 노래 https://open.spotify.com/track/4zgZ7dq1BcrhmLRA8bPF4c
+#song12 물론 https://open.spotify.com/track/1S3Qtj2QGy4KQKbtOZZQ7d
+#song13 슬픔 속에 그댈 지워야만 해 https://open.spotify.com/track/4nb9rDtnLe51Z2Nzy0liQH
+#song14 니가 빈 자리 https://open.spotify.com/track/5X3BdhFqPDptGjIwaCUs38
+
+songlist<-c("48cc6ddojyx8EPlDrIeHlp","2uaC8QIz0OocPl8bFcNFt0","03YtYSkpHqqY3EBmHJkTjP","0cI7LmBgwXN4Sv7W2zWsD3",
+            "7c8cPVLWvtZwxDxA3KkWFP", "57jBcQUCJaIUTRbqBmW7D1","3jEEkgLOxZLg2mcteCLTwA","2fRFwWwZG7Qfkui7GcxTMy",
+            "1lv17MSSDr1iBS2vp6UoRt", "6udwOVrx63wvimCGhc89fU", "4zgZ7dq1BcrhmLRA8bPF4c","1S3Qtj2QGy4KQKbtOZZQ7d",
+            "4nb9rDtnLe51Z2Nzy0liQH","5X3BdhFqPDptGjIwaCUs38")
+
+#필요없는 속성 버리기
+song_delete_feature<-function(song_feature){
+  song_feature %>%
+    select(-c(id,loudness,duration_ms,time_signature,key,id,uri,track_href,analysis_url,duration_ms,type,mode,
+              tempo,instrumentalness))
+}
+
+#변수 할당, song[i]_feature, song_total
+song_total<-data.frame()
+for(i in 1:length(songlist)){
+  var<-paste("song",i,"_feature",sep="")
+  assign(var,song_delete_feature(get_track_audio_features(songlist[i])))
+  song_total<-rbind(song_total, song_delete_feature(get_track_audio_features(songlist[i])))
+}
+
+#gather_song
+for(i in 1:nrow(song_total)){
+  gather_var<-paste("gather_song",i,sep="")
+  assign(gather_var,gather(song_total[i,], feature, value))
+}
+
+#곡별 특성비교 시각화
+song_df_graph<-data.frame()
+gather_song_df<-rbind(gather_song1,gather_song2,gather_song3, gather_song4, gather_song5, gather_song6, gather_song7, gather_song8, gather_song9, gather_song10,gather_song11,gather_song12,gather_song13,gather_song14)
+gather_song_df$data<-c(rep("song1", nrow(gather_song1)),rep("song2", nrow(gather_song2)),rep("song3", nrow(gather_song3)),
+                       rep("song4", nrow(gather_song4)),rep("song5", nrow(gather_song5)),rep("song6", nrow(gather_song6)),
+                       rep("song7", nrow(gather_song7)),rep("song8", nrow(gather_song8)),rep("song9", nrow(gather_song9)),
+                       rep("song10", nrow(gather_song10)),rep("song11", nrow(gather_song11)),rep("song12", nrow(gather_song12)),
+                       rep("song13", nrow(gather_song13)),rep("song14", nrow(gather_song14)))
+gather_song_df$data<-factor(gather_song_df$data, levels=c("song1","song2","song3","song4","song5","song6","song7","song8","song9",
+                                                          "song10","song11","song12","song13","song14"))
+ggplot(gather_song_df)+geom_col(aes(x=feature,y=value,fill=data),position = "dodge")
+
+########코사인 거리구하기, 0에 가까울수록 비슷함
+song_total_df<-as.data.frame(song_total)
+song_dist<-as.matrix(dist(song_total_df,method = "cosine")) #대체로 0에 가깝게 나옴. 추천시스템에 적용할 수 있을 것으로 판단됨
+song_dist
