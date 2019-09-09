@@ -225,7 +225,7 @@ jan_feature<-jan_feature[1:48,]
 #feature 평균 함수 
 feature_mean<-function(artist_feature){
   artist_feature %>%
-    select(-c(id,loudness,tempo,duration_ms,time_signature,key)) %>%
+    select(-c(id,loudness,tempo,duration_ms,time_signature,key,mode)) %>%
     summarise_all(funs(mean))
 }
 
