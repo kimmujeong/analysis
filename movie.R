@@ -10,7 +10,7 @@ movies<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\movies.csv",header = TRUE)
 #users<-read.csv("C:\\Users\\thgus\\Downloads\\movie\\users.dat",header=FALSE)
 #tags 데이터 활용해서 tf-idf로 추천가능해보임
 #추천모델가능한 모든 것 #ALS, ALS_implicit, IBCF, POPULAR, RANDOM, RECOMMEND, SVD, SVDF, UBCF
-head(rating,20)
+head(rating)
 head(movies)
 # which(movies$title=="[REC]쨀 3 G챕nesis (2012)") 오류값 찾기
 head(movies)
@@ -256,7 +256,7 @@ model_to_evaluate<-"IBCF"
 model_parameters<-NULL
 
 #모델 생성
-eval_recommender<-Recommender(data=getData(eval_sets,"train"), method=model_to_evaluate,parameter=model_parameters)성
+eval_recommender<-Recommender(data=getData(eval_sets,"train"), method=model_to_evaluate,parameter=model_parameters)
 
 item_to_recommend<-6 #추천할 아이템 수 
 eval_predict<-predict(eval_recommender, newdata=getData(eval_sets,"known"),n=item_to_recommend,type="ratings") #예측된 평점의 매트릭스 

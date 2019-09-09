@@ -12,7 +12,8 @@ library(corrplot)
 home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
 home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
 rm(list=ls())
-
+str(home_train)
+str(home_test)
 ################################################
 ########################상관관계###############
 # home_train<-home_train %>%
@@ -137,6 +138,7 @@ home_train$zipcode<-as.numeric(home_train$zipcode)
 home_train$sqft_living15<-as.numeric(home_train$sqft_living15)
 home_train$sqft_lot15<-as.numeric(home_train$sqft_lot15)
 home_train$weekday<-as.numeric(home_train$weekday)
+home_train<-lapply(home_train, as.numeric)
 str(home_train)
 
 new_home_test$bedrooms<-as.numeric(new_home_test$bedrooms)
@@ -153,6 +155,7 @@ new_home_test$yr_renovated<-as.numeric(new_home_test$yr_renovated)
 new_home_test$zipcode<-as.numeric(new_home_test$zipcode)
 new_home_test$sqft_living15<-as.numeric(new_home_test$sqft_living15)
 new_home_test$sqft_lot15<-as.numeric(new_home_test$sqft_lot15)
+home_test<-lapply(home_test,as.numeric)
 #lapply(new_home_test,as.numeric) 써보기 
 str(new_home_test)
 ################################################################################
