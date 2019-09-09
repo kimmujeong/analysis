@@ -1,3 +1,4 @@
+library(ggmap)
 library(XML)
 library(data.table)
 library(stringr) #str_extract_all
