@@ -1,0 +1,101 @@
+---
+title: "portfolio6"
+output: html_document
+---
+
+## 데이터, 라이브러리 로드 
+```{r, message=FALSE, warning=FALSE}
+library(data.table)
+library(Matrix)
+library(dplyr)
+library(MLmetrics) #cv
+library(lightgbm)
+library(ggplot2)
+
+train<-read.csv("/home/kmj/porto/train.csv")
+test<-read.csv("/home/kmj/porto/test.csv")
+```
+
+## 데이터 전처리 
+```{r}
+#Feature Engineering
+test$target = NA
+data = rbind(train, test)
+
+#LGB데이터셋으로 변환
+varnames = setdiff(colnames(data), c("id", "target")) # setdiff:차집합 data컬럼이름에서 id, target 제외하고 가져오기
+
+train_sparse = Matrix(as.matrix(train[,varnames]), sparse=TRUE) #sparse matrix 형태로 변환
+test_sparse  = Matrix(as.matrix(test[,varnames]), sparse=TRUE) #sparse matrix 형태로 변환
+
+y_train  = train[,c("target")]
+test_ids = test[,c("id")]
+
+lgb.train = lgb.Dataset(data=train_sparse, label=y_train)
+```
+
+## 파리미터 설정
+```{r}
+#파라미터 세팅 
+lgb.grid = list(objective = "binary",
+                metric = "auc",
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = 0.7,
+                bagging_fraction = 0.7,
+                bagging_freq = 5,
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = 8,
+                lambda_l2 = 1.3,
+                min_data_in_bin=100,
+                min_gain_to_split = 10,
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+```
+
+
+## Gini 평가함수 설정
+```{r}
+# Gini 평가함수 설정(Gini for Lgb)
+lgb.normalizedgini = function(preds, dtrain){
+  actual = getinfo(dtrain, "label")
+  score  = NormalizedGini(preds,actual)
+  return(list(name = "gini", value = score, higher_better = TRUE))
+}
+```
+
+
+## 교차검증, Cross Validation
+```{r}
+#교차검증, Cross Validation
+# lgb.model.cv = lgb.cv(params = lgb.grid, data = lgb.train, learning_rate = 0.02, num_leaves = 25,
+#                       num_threads = 2 , nrounds = 7000, early_stopping_rounds = 50, #nrounds:7000
+#                       eval_freq = 20, eval = lgb.normalizedgini,
+#                       nfold = 5, stratified = TRUE)
+# best.iter = lgb.model.cv$best_iter
+best.iter=525
+```
+
+## 모델생성 
+```{r}
+#모델생성 
+lgb.model = lgb.train(params = lgb.grid, data = lgb.train, learning_rate = 0.02,
+                      num_leaves = 25, num_threads = 2 , nrounds = best.iter,
+                      eval_freq = 20, eval = lgb.normalizedgini)
+```
+
+## 변수중요도
+```{r}
+#변수중요도
+tree_imp <- lgb.importance(lgb.model, percentage = TRUE)
+lgb.plot.importance(tree_imp, top_n = 10, measure = "Gain") #lgb자체함수 
+ggplot(tree_imp,aes(x=reorder(Feature, Gain),y=Gain))+geom_bar(stat="identity")+coord_flip() #ggplot표현 
+```
+
+## 예측 및 결과파일 생성
+```{r}
+#예측 및 결과파일 생성
+result<-predict(lgb.model,test_sparse)
+test$target<-result
+write.csv(test[,c("id","target")], file="/home/kmj/save_csv/save_lightgbm_best_iter_391_setseed.csv", row.names = FALSE)
+```

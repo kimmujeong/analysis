@@ -1,0 +1,145 @@
+library(dplyr)
+library(arules) #연관분석
+library(arulesViz) #연관분석 그래프
+library(tidyr) #spread
+library(tibble) #remove_rownames
+library(recommenderlab) #evalustionSchme, realRatingMatrix
+
+order_products__prior<-read.csv("/home/kmj/order/order_products__prior.csv")
+orders<-read.csv("/home/kmj/order/orders.csv")
+products<-read.csv("/home/kmj/order/products.csv",encoding = "UTF-8")
+
+#연관분석
+sample<-order_products__prior[1:20000,]
+sample_join<-sample %>%
+  left_join(products,by="product_id")
+sample_join_split<-split(sample_join$product_name, sample_join$order_id)
+sample_join_transactions<-as(sample_join_split,"transactions")
+rules<-apriori(sample_join_transactions, parameter=list(support=0.001, confidence=0.8, minlen = 3))
+summary(rules)
+inspect(rules[1:50])
+
+inspect(subset(rules, subset = rhs %pin% "Banana")[1:10])
+lift_top5<-head(sort(rules, by ="lift"),5) #연관성이 강한 5개 뽑기
+inspect(lift_top5)
+plot(lift_top5, method = "graph",control=list(type="items",main=""))
+
+#재주문시 연관분석
+reordered_sample<-sample_join %>%
+  filter(reordered==1)
+reordered_sample_split<-split(reordered_sample$product_name,reordered_sample$order_id)
+reordered_sample_transations<-as(reordered_sample_split,"transactions")
+reordered_rule<-apriori(reordered_sample_transations,parameter = list(support=0.001, confidence=0.8, minlen = 3))
+inspect(reordered_rule[1:10])
+
+#협업필터링
+order_products__prior<-order_products__prior %>%
+  arrange(order_id)
+
+join_df<-order_products__prior %>%
+  left_join(orders,by="order_id") %>%
+  left_join(products, by="product_id")
+
+join_df2<-join_df %>%
+  select(order_id,product_id,reordered,user_id,product_name)
+
+#카운트 기반 협업필터링
+count_df<-join_df2 %>%
+  group_by(user_id) %>%
+  count(product_name)
+
+count_df2<-count_df %>%
+  filter(n>50)
+
+spread(count_df2,product_name,n)
+count_mat <- spread(count_df2, product_name, n) %>%
+  remove_rownames() %>%
+  column_to_rownames(var="user_id")
+
+count_rrm <- as(as(count_mat, "matrix"), "realRatingMatrix")
+rating_eval <- evaluationScheme(count_rrm, method="split", train=0.7, given=1)
+#as(count_rrm,"list")
+rating_eval
+
+#UBCF
+ubcf_model <- Recommender(getData(rating_eval, "train"), method = "UBCF", 
+                          param=list(normalize = "center", method="Cosine")) #method:cosine, pearson 유사도 선정방식
+ubcf_pred <- predict(ubcf_model, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100)
+calcPredictionAccuracy(ubcf_pred, getData(rating_eval, "unknown"))
+
+ubcf_pred <- predict(object = ubcf_model, newdata = count_rrm,  n = 5)
+ubcf_pred_list<-as(ubcf_pred,"list")
+
+####data table로 보여주는 작업
+df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  if(identical(ubcf_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+    df[i,]<-NA
+  }
+  else{
+    df[i,]<-unlist(ubcf_pred_list[i],use.names = FALSE) #unlist를 이용해서 product_name 각각 하나하나씩 나누기
+  }
+}
+
+user_id<-names(ubcf_pred_list) #리스트 이름 가져오기=user_id 가져오기
+rownames(df)=user_id
+
+df %>%
+  DT::datatable()
+
+#IBCF
+ibcf_model <- Recommender(getData(rating_eval, "train"), method = "IBCF", param=list(k=30)) #k:유사도 값을 계산하는데 고려되는 이웃의 수
+ibcf_pred <- predict(ibcf_model, getData(rating_eval, "known"), type="ratings")
+options("scipen" = 100)
+calcPredictionAccuracy(ibcf_pred, getData(rating_eval, "unknown"))
+
+ibcf_pred <- predict(object = ibcf_model, newdata = count_rrm,  n = 5) 
+ibcf_pred_list<-as(ibcf_pred,"list")
+
+####data table로 보여주는 작업
+user_id<-names(ibcf_pred_list) #리스트 이름 가져오기=user_id 가져오기
+ibcf_df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  for(j in 1:5){
+    if(identical(ibcf_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+      ibcf_df[i,]<-NA
+    } 
+    else{
+      ibcf_df[i,j]<-unlist(ibcf_pred_list[i],use.names = FALSE)[j]
+    }
+  }
+}
+
+rownames(ibcf_df)=user_id
+
+ibcf_df %>%
+  DT::datatable()
+
+#POPULAR
+popular_model<-Recommender(getData(rating_eval,"train"), method="POPULAR")
+popular_pred<-predict(popular_model,newdata=count_rrm,n=5)
+popular_pred_list<-as(popular_pred,"list")
+
+####data table로 보여주는 작업
+user_id<-names(popular_pred_list) #리스트 이름 가져오기=user_id 가져오기
+popular_df<-data.frame(matrix(nrow=2169,ncol=5)) #빈 df생성 
+
+for(i in 1:2169){
+  for(j in 1:5){
+    if(identical(popular_pred_list[[i]],character(0))){ #character(0)인 부분이 있어서 판별
+      popular_df[i,]<-NA
+    } 
+    else{
+      popular_df[i,j]<-unlist(popular_pred_list[i],use.names = FALSE)[j]
+    }
+  }
+}
+
+rownames(popular_df)=user_id
+
+popular_df %>%
+  DT::datatable()
+
