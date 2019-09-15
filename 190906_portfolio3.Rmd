@@ -4,7 +4,7 @@ output: html_document
 ---
 
 ## 라이브러리, 데이터로드 
-```{r, message=FALSE}
+```{r, message=FALSE, warning=FALSE}
 library(dplyr)
 library(tidyr)
 library(tibble)
