@@ -4,16 +4,19 @@ author: "kmj"
 output: html_document
 ---
 
-
-```{r, message=FALSE}
+## 라이브러리, 데이터로드
+```{r, message=FALSE, warning=FALSE}
 library(dplyr)
 library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
 
-home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
-home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
+home_train<-read.csv("/home/kmj/2019-2nd-ml-month-with-kakr/train.csv")
+home_test<-read.csv("/home/kmj/2019-2nd-ml-month-with-kakr/test.csv")
+```
 
+## 데이터 전처리
+```{r}
 #train파일 전처리
 #정규화
 home_train$bedrooms<-log1p(home_train$bedrooms)
@@ -52,7 +55,10 @@ home_test<-home_test %>%
 
 home_train<-as.data.frame(apply(home_train, 2, function(x) (as.numeric(x))))
 home_test<-as.data.frame(apply(home_test, 2, function(x) (as.numeric(x))))
+```
 
+## 파라미터값 탐색
+```{r}
 #파라미터값 탐색
 getParamSet("regr.xgboost")
 xg_set <- makeLearner("regr.xgboost", predict.type = "response")
@@ -81,7 +87,7 @@ trainTask <- makeRegrTask(data = home_train,target = "price")
 ```
 
 
-
+## 모델생성
 ```{r}
 #모델생성
 xgb_train<-data.matrix(subset(home_train,select = -c(price)))
@@ -97,14 +103,28 @@ xgbmodel<-xgboost(data=xgb_train,
                   #nthread = 3,
                   max_depth = 6,
                   print_every_n = 100L)
+```
 
+## 변수중요도
+```{r}
 #변수중요도 
 var_importance<-xgb.importance(colnames(xgb_train),xgbmodel)
 ggplot(data = var_importance, aes(x = reorder(Feature, Gain), y = Gain)) +geom_bar(stat = 'identity')+coord_flip()
 xgb.plot.importance(var_importance) #xgb자체함수
+```
 
+
+## 최종 예측 및 예측파일 생성
+```{r}
 #최종 예측 및 예측파일 생성
 xgb_test<-data.matrix(subset(home_test, select = -c(id)))
 home_test$price<-predict(xgbmodel, xgb_test)
 write.csv(home_test[,c("id","price")],file="home_xgb.csv",row.names = FALSE)
 ```
+
+## 점수
+public 점수
+![image](/home/kmj/image/kakr2nd_public.PNG)
+
+private 점수
+![image2](/home/kmj/image/kakr2nd_private.PNG)

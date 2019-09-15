@@ -3,8 +3,8 @@ library(xgboost)
 library(ggplot2)
 library(mlr) #파리미터튜닝
 
-home_train<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\train.csv")
-home_test<-read.csv("C:\\Users\\thgus\\Downloads\\2019-2nd-ml-month-with-kakr\\test.csv")
+home_train<-read.csv("/home/kmj/2019-2nd-ml-month-with-kakr/train.csv")
+home_test<-read.csv("/home/kmj/2019-2nd-ml-month-with-kakr/test.csv")
 
 #train파일 전처리
 #정규화
