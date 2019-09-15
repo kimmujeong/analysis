@@ -99,3 +99,7 @@ result<-predict(lgb.model,test_sparse)
 test$target<-result
 write.csv(test[,c("id","target")], file="/home/kmj/save_csv/save_lightgbm_best_iter_391_setseed.csv", row.names = FALSE)
 ```
+
+## 점수
+리더보드 점수
+![image](/home/kmj/image/porto.png)
